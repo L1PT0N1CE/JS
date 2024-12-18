@@ -11,7 +11,7 @@
 (function() {
   const texts = [
     	"KANATAZA",
-        "CHRKLEI",
+        "ALDOAMAR",
         "RMALOGOR",
         "SHALSAMI",
         "HESIMONM",
