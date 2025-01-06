@@ -14,7 +14,7 @@
 	"Open",
         "In Progress",
         "Remedy Request",
-        "On Hold"
+        "On Hold",
       ];
 
   function filterTexts(input) {
