@@ -11,10 +11,10 @@
 (function() {
   const texts = [
     	"Freigegeben",
-	"Open"
-      "In Progress",
-      "Remedy Request",
-      "On Hold"
+	"Open",
+        "In Progress",
+        "Remedy Request",
+        "On Hold"
       ];
 
   function filterTexts(input) {
