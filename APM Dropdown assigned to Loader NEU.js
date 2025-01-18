@@ -11,14 +11,13 @@
 (function() {
   const texts = [
     	"KANATAZA",
-        "ALDOAMAR",
+        "KLIKEVI",
         "RMALOGOR",
         "SHALSAMI",
         "HESIMONM",
         "ARWIESNE",
         "USSAXEL",
-        "TLUHAMME",
-        "CANCELIK",
+        "CANCICEK",
         "DALDALCI",
         "IVELIK",
         "HSSHIMEN",
