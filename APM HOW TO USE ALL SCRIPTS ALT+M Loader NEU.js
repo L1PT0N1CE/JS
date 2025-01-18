@@ -61,8 +61,6 @@
         <p>ALT+4 = Opens a Window for Time booking (buggy)</p>
         <p>ALT+5 = by right-clicking on the work order (field update) you have to click 2x ALT+5 so that “assigned to” is filled in</p>
         <p>ALT+6 = Same way like ALT+5 but it fills the Workorder Status to "Completed"</p>
-        <p>ALT+7 = Fills out the Form for Follow-Ups</p>
-        <p>The Button on the top right will fill out the description with the Failure Codes from Follow Ups (its not the first one on the top, you will see)</p>
         <h3>To open and close this Window press ALT+M</h3>
     `;
     modalContainer.appendChild(modalContent);
