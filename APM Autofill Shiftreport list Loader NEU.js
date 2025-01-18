@@ -10,12 +10,12 @@
 
 (function() {
   const texts = [
-    "01 Safety Tip",
-    "02 Success Story",
-    "03 VDL Top Tech Issue",
-    "04 Additional VDL Information",
-    "05 AR Top Tech Issue",
-    "06 AR Additional Information"
+    "Safety Tip",
+    "Success Story",
+    "VDL Top Tech Issue",
+    "Additional VDL Information",
+    "AR Top Tech Issue",
+    "AR Additional Information"
       ];
 
   function filterTexts(input) {
