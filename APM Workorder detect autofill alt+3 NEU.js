@@ -106,11 +106,11 @@
             causeCodeField.value = "LOOSE";
             causeCodeField.dispatchEvent(changeEvent);
         } else if(description.includes("south") || description.includes("süden") || description.includes("westen") || description.includes("outbound conveyor") || description.includes("Band") || description.includes("belt") || description.includes("west")) {
-            problemCodeField.value = "MECH";
+            problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
-            failureCodeField.value = "BELT";
+            failureCodeField.value = "PE";
             failureCodeField.dispatchEvent(changeEvent);
-            causeCodeField.value = "JAM";
+            causeCodeField.value = "COVERED";
             causeCodeField.dispatchEvent(changeEvent);    
         } else if(description.includes("estop") || description.includes("e-stop") || description.includes("fault") || description.includes("faulted")) {
             problemCodeField.value = "ROBOTICS";
@@ -127,18 +127,18 @@
             causeCodeField.value = "ALIGN";
             causeCodeField.dispatchEvent(changeEvent);
         } else if(description.includes("depal") || description.includes("palletizer") || description.includes("rolle") || description.includes("roll") || description.includes("outbound") || description.includes("conveyor") || description.includes("rolls") || description.includes("rollen") || description.includes("depalletizer")) {
-            problemCodeField.value = "MECH";
+            problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
-            failureCodeField.value = "ROLLER";
+            failureCodeField.value = "PE";
             failureCodeField.dispatchEvent(changeEvent);
-            causeCodeField.value = "JAM";
+            causeCodeField.value = "COVERED";
             causeCodeField.dispatchEvent(changeEvent);
         } else if(description.includes("destacker") || description.includes("destaker") || description.includes("desktaker") || description.includes("destecker") || description.includes("distaker") || description.includes("stapel") || description.includes("stapler") || description.includes("lift") || description.includes("lifter")) {
-            problemCodeField.value = "MECH";
+            problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
-            failureCodeField.value = "CYLINDR";
+            failureCodeField.value = "PE";
             failureCodeField.dispatchEvent(changeEvent);
-            causeCodeField.value = "JAM";
+            causeCodeField.value = "COVERED";
             causeCodeField.dispatchEvent(changeEvent);
         } else if(description.includes("chain") || description.includes("kette")) {
             problemCodeField.value = "MECH";
