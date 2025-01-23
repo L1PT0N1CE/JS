@@ -1,0 +1,64 @@
+// ==UserScript==
+// @name         Checkbox GODFATHER ALT+1 ALT+2
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Checkboxen alles rasiert
+// @author       Kanataza
+// @match        https://eu1.eam.hxgnsmartcloud.com/*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+
+    function checkSpecificCheckboxes() {
+        const rows = document.querySelectorAll('tr'); // Annahme: Checkliste ist in Tabellenzeilen organisiert
+        rows.forEach(row => {
+            // Sucht das Wort "Nein" oder "No" in der Zeile
+            if (row.textContent.includes('Nein') || row.textContent.includes('No')) {
+                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
+                if (checkbox && !checkbox.checked) {
+                    checkbox.click(); // Checkbox abhaken
+                }
+            }
+
+            if (row.textContent.includes('Abgeschlossen:') || row.textContent.includes('Completed:')) {
+                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
+                if (checkbox && !checkbox.checked) {
+                    checkbox.click(); // Checkbox abhaken
+                }
+            }
+        });
+    }
+
+
+    function uncheckSpecificCheckboxes() {
+        const rows = document.querySelectorAll('tr');
+        rows.forEach(row => {
+
+            if (row.textContent.includes('Nein') || row.textContent.includes('No')) {
+                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
+                if (checkbox && checkbox.checked) {
+                    checkbox.click(); // Checkbox enthaken
+                }
+            }
+            // Sucht das Wort "Abgeschlossen:" oder "Completed:" in der Zeile
+            if (row.textContent.includes('Abgeschlossen:') || row.textContent.includes('Completed:')) {
+                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
+                if (checkbox && checkbox.checked) {
+                    checkbox.click(); // Checkbox enthaken
+                }
+            }
+        });
+    }
+
+    // Event-Listener für Alt+1 (Abhaken) und Alt+2 (Enthaken)
+    document.addEventListener('keydown', function(event) {
+        if (event.altKey && event.key === '1') {
+            checkSpecificCheckboxes();
+        } else if (event.altKey && event.key === '2') {
+            uncheckSpecificCheckboxes();
+        }
+    });
+})();
