@@ -12,7 +12,7 @@
   const texts = [
     	"KANATAZA",
         "KLIKEVI",
-        "jsonsta",
+        "jSONSTA",
         "RMALOGOR",
         "SHALSAMI",
         "HESIMONM",
