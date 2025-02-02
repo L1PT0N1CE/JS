@@ -11,6 +11,9 @@
 (function() {
   const texts = [
     	"AR",
+        "fido",
+        "charger",
+        "omni",
         "Clean",
         "Alu",
         "[",
