@@ -11,54 +11,48 @@
 (function() {
     'use strict';
 
-
-    function checkSpecificCheckboxes() {
-        const rows = document.querySelectorAll('tr'); // Annahme: Checkliste ist in Tabellenzeilen organisiert
-        rows.forEach(row => {
-            // Sucht das Wort "Nein" oder "No" in der Zeile
-            if (row.textContent.includes('Nein') || row.textContent.includes('No')) {
-                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
-                if (checkbox && !checkbox.checked) {
-                    checkbox.click(); // Checkbox abhaken
-                }
-            }
-
-            if (row.textContent.includes('Abgeschlossen:') || row.textContent.includes('Completed:')) {
-                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
-                if (checkbox && !checkbox.checked) {
-                    checkbox.click(); // Checkbox abhaken
+    function checkLeftCheckboxes() {
+        document.querySelectorAll('tr').forEach(row => {
+            const checkboxes = row.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length >= 2) {
+                const leftCheckbox = checkboxes[0]; // Linke Checkbox
+                if (leftCheckbox && !leftCheckbox.checked) {
+                    leftCheckbox.click();
                 }
             }
         });
     }
 
-
-    function uncheckSpecificCheckboxes() {
-        const rows = document.querySelectorAll('tr');
-        rows.forEach(row => {
-
-            if (row.textContent.includes('Nein') || row.textContent.includes('No')) {
-                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
-                if (checkbox && checkbox.checked) {
-                    checkbox.click(); // Checkbox enthaken
-                }
-            }
-            // Sucht das Wort "Abgeschlossen:" oder "Completed:" in der Zeile
-            if (row.textContent.includes('Abgeschlossen:') || row.textContent.includes('Completed:')) {
-                const checkbox = row.querySelector('input[type="checkbox"]'); // Checkbox in der Zeile
-                if (checkbox && checkbox.checked) {
-                    checkbox.click(); // Checkbox enthaken
+    function checkRightCheckboxes() {
+        document.querySelectorAll('tr').forEach(row => {
+            const checkboxes = row.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length >= 2) {
+                const rightCheckbox = checkboxes[1]; // Rechte Checkbox
+                if (rightCheckbox && !rightCheckbox.checked) {
+                    rightCheckbox.click();
                 }
             }
         });
     }
 
-    // Event-Listener für Alt+1 (Abhaken) und Alt+2 (Enthaken)
+    function uncheckAllCheckboxes() {
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            if (checkbox.checked) {
+                checkbox.click();
+            }
+        });
+    }
+
+    // Event-Listener für Alt+1 (links), Alt+X (rechts) und Alt+2 (alles enthaken)
     document.addEventListener('keydown', function(event) {
         if (event.altKey && event.key === '1') {
-            checkSpecificCheckboxes();
+            checkLeftCheckboxes();
+        } else if (event.altKey && event.key.toLowerCase() === 'x') {
+            checkRightCheckboxes();
         } else if (event.altKey && event.key === '2') {
-            uncheckSpecificCheckboxes();
+            uncheckAllCheckboxes();
         }
     });
+
+    console.log('Checkbox-Skript läuft...');
 })();
