@@ -126,7 +126,7 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "ALIGN";
             causeCodeField.dispatchEvent(changeEvent);
-        } else if(description.includes("depal") || description.includes("palletizer") || description.includes("rolle") || description.includes("roll") || description.includes("outbound") || description.includes("conveyor") || description.includes("rolls") || description.includes("rollen") || description.includes("depalletizer")) {
+        } else if(description.includes("depal") || description.includes("palletizer") || description.includes("rolle") || description.includes("dpal") || description.includes("roll") || description.includes("outbound") || description.includes("conveyor") || description.includes("rolls") || description.includes("rollen") || description.includes("depalletizer")) {
             problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
             failureCodeField.value = "PE";
