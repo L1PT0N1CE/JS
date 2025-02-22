@@ -51,8 +51,13 @@
 
         workOrderTypeField.value = "Corrective";
         workOrderTypeField.dispatchEvent(changeEvent);
-        workOrderStatusField.value = "In Progress";
-        workOrderStatusField.dispatchEvent(changeEvent);
+
+        // Only fill workOrderStatusField if it is not already "In Progress"
+        if (workOrderStatusField.value !== "In Progress") {
+            workOrderStatusField.value = "In Progress";
+            workOrderStatusField.dispatchEvent(changeEvent);
+        }
+
         udfChar13Field.value = "EXDN";
         udfChar13Field.dispatchEvent(changeEvent);
         udfChar24Field.value = "NO";
