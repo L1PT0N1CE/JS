@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Checkbox GODFATHER ALT+1 ALT+X
+// @name         Checkbox GODFATHER ALT+1 ALT+2
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.2
 // @description  Checkboxen alles rasiert
 // @author       Kanataza
 // @match        https://eu1.eam.hxgnsmartcloud.com/*
@@ -48,9 +48,9 @@
         if (event.altKey && event.key === '1') {
             checkLeftCheckboxes();
         } else if (event.altKey && event.key === '2') {
-            checkRightCheckboxes();
+            checkRightCheckboxes(); // Alt+2 hakt jetzt die rechte Seite ab
         } else if (event.altKey && event.key.toLowerCase() === 'x') {
-            uncheckAllCheckboxes();
+            uncheckAllCheckboxes(); // Alt+X entfernt jetzt alles
         }
     });
 
