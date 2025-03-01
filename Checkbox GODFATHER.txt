@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Checkbox GODFATHER ALT+1 ALT+2
+// @name         Checkbox GODFATHER ALT+1 ALT+X
 // @namespace    http://tampermonkey.net/
 // @version      1.0
 // @description  Checkboxen alles rasiert
@@ -43,13 +43,13 @@
         });
     }
 
-    // Event-Listener für Alt+1 (links), Alt+X (rechts) und Alt+2 (alles enthaken)
+    // Event-Listener für Alt+1 (links), Alt+2 (rechts) und Alt+X (alles enthaken)
     document.addEventListener('keydown', function(event) {
         if (event.altKey && event.key === '1') {
             checkLeftCheckboxes();
-        } else if (event.altKey && event.key.toLowerCase() === 'x') {
-            checkRightCheckboxes();
         } else if (event.altKey && event.key === '2') {
+            checkRightCheckboxes();
+        } else if (event.altKey && event.key.toLowerCase() === 'x') {
             uncheckAllCheckboxes();
         }
     });
