@@ -47,9 +47,9 @@
     document.addEventListener('keydown', function(event) {
         if (event.altKey && event.key === '1') {
             checkLeftCheckboxes();
-        } else if (event.altKey && event.key.toLowerCase() === 'x') {
+        } else if (event.altKey && event.key.toLowerCase() === '2') {
             checkRightCheckboxes();
-        } else if (event.altKey && event.key === '2') {
+        } else if (event.altKey && event.key === 'x') {
             uncheckAllCheckboxes();
         }
     });
