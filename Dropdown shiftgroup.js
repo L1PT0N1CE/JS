@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        APM Dropdown Shiftgroup
+// @name        Dropdown Shiftgroup
 // @version     0.1
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
