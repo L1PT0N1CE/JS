@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        APM Dropdown Objects Loader NEU
+// @name        Dropdown Objects Loader NEU
 // @version     0.4
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
