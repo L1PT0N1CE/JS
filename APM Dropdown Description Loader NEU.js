@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        APM Dropdown Description Loader NEU
+// @name        Dropdown Description Loader NEU
 // @version     0.1
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
