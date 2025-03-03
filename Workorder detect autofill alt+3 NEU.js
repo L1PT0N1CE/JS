@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         APM Workorder detect autofill alt+3 NEU
+// @name         Workorder detect autofill alt+3 NEU
 // @namespace    http://tampermonkey.net/
 // @version      0.3
 // @description  Autofills fields in the work order form based on description keywords.
