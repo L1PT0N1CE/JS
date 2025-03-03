@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        APM Dropdown Workorder Search Objects Loader NEU
+// @name        Dropdown Workorder Search Objects Loader NEU
 // @version     0.3
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
