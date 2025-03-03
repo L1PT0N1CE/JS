@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        Shiftreport list
+// @name        Shifteport list
 // @version     0.1
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
