@@ -2,7 +2,7 @@
 // @name         HOW TO USE ALL SCRIPTS ALT+M Loader NEU
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  Displays a box with specific instructions on APM scripts
+// @description  Displays a box with specific instructions on scripts
 // @author       Kanataza
 // @match        https://eu1.eam.hxgnsmartcloud.com/*
 // @grant        none
