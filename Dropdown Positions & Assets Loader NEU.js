@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        APM Dropdown Positions & Assets Loader NEU
+// @name        Dropdown Positions & Assets Loader NEU
 // @version     0.3
 // @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
 // @author      Kanataza
