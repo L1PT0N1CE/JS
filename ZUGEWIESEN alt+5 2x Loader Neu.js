@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         APM ZUGEWIESEN alt+5 2x Loader Neu
+// @name         ZUGEWIESEN alt+5 2x Loader Neu
 // @namespace    http://tampermonkey.net/
 // @version      0.2
 // @description  Füllt Felder aus
