@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         APM SCHLIEßEN alt+6 2x Loader NEU DE
+// @name         SCHLIEßEN alt+6 2x Loader NEU DE
 // @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  Füllt felder aus
