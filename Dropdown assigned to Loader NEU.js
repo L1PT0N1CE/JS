@@ -10,21 +10,21 @@
 
 (function() {
   const texts = [
-    	"KANATAZA",
-        "ALTVAA",
-        "KLIKEVI",
-        "jSONSTA",
-        "RMALOGOR",
-        "SHALSAMI",
-        "HESIMONM",
-        "ARWIESNE",
-        "USSAXEL",
-        "CANCICEK",
-        "DALDALCI",
-        "IVELIK",
-        "HSSHIMEN",
-        "SPRINOLI",
-        "CHFGC",
+"KANATAZA",
+"ALTVAA",
+"KLIKEVI",
+"jSONSTA",
+"RMALOGOR",
+"SHALSAMI",
+"HESIMONM",
+"ARWIESNE",
+"USSAXEL",
+"CANCICEK",
+"DALDALCI",
+"IVELIK",
+"HSSHIMEN",
+"SPRINOLI",
+"CHFGC",
       ];
 
   function filterTexts(input) {
