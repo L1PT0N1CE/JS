@@ -11,6 +11,7 @@
 (function() {
   const texts = [
     	"KANATAZA",
+        "ALTVAA",
         "KLIKEVI",
         "jSONSTA",
         "RMALOGOR",
