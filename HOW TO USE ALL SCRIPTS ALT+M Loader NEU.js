@@ -15,17 +15,17 @@
 
     // Function to get the saved modal state
     function getModalState() {
-        return localStorage.getItem('apm-modal-closed') === 'true';
+        return localStorage.getItem('xyz-modal-closed') === 'true';
     }
 
     // Function to set the modal state
     function setModalState(isClosed) {
-        localStorage.setItem('apm-modal-closed', isClosed);
+        localStorage.setItem('xyz-modal-closed', isClosed);
     }
 
     // Create the modal container
     var modalContainer = document.createElement('div');
-    modalContainer.id = 'apm-modal-container';
+    modalContainer.id = 'xyz-modal-container';
     modalContainer.style.position = 'fixed';
     modalContainer.style.zIndex = '10000';
     modalContainer.style.left = '50%';
@@ -56,7 +56,7 @@
     // Create the content of the modal
     var modalContent = document.createElement('div');
     modalContent.innerHTML = `
-        <h2>APM Script Instructions</h2>
+        <h2>xyz Script Instructions</h2>
         <p>ALT+1 = Fills out the Checklist/Füllt Checkliste aus</p>
         <p>ALT+2 = Remove the check on the Checklist/Entfernt das abgehakte in der Checkliste</p>
         <p>ALT+3 = Fills out the Record View in a WO for Tickets/Füllt Datenansicht automatisch aus</p>
