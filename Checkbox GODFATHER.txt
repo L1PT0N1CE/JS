@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         Checkbox GODFATHER ALT+1 ALT+2
+// @name         Checkbox GODFATHER ALT+1 ALT+2 ALT+x
 // @namespace    http://tampermonkey.net/
 // @version      1.2
 // @description  Checkboxen alles rasiert
 // @author       Kanataza
-// @match        https://eu1.eam.hxgnsmartcloud.com/*
+// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @grant        none
 // ==/UserScript==
 
