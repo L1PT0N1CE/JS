@@ -4,7 +4,7 @@
 // @description  Zeigt die aktuelle Kalenderwoche oben rechts auf www.xyz.de an
 // @author       Dein Name
 // @match        https://www.google.com/*
-// @match        https://eu1.eam.hxgnsmartcloud.com/web/base/COMMON*
+// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @match        https://duckduckgo.com/*
 // @match        https://w.amazon.com/bin/*
 // @match        https://quip-amazon.com/*
