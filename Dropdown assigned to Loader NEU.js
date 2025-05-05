@@ -11,10 +11,12 @@
 (function() {
   const texts = [
 "KANATAZA",
+"IVELIK",
+"HSSHIMEN",
+"RMALOGOR",
 "ALTVAA",
 "KLIKEVI",
 "jSONSTA",
-"RMALOGOR",
 "WAJDAILA",
 "KARAILY",
 "SCHMIDQD",
@@ -23,8 +25,6 @@
 "USSAXEL",
 "CANCICEK",
 "DALDALCI",
-"IVELIK",
-"HSSHIMEN",
 "SPRINOLI",
 "CHFGC",
       ];
