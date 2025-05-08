@@ -131,7 +131,7 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "ALIGN";
             causeCodeField.dispatchEvent(changeEvent);
-        } else if(description.includes("Aether")) {
+        } else if(description.includes("aether")) {
             problemCodeField.value = "ROBOTICS";
             problemCodeField.dispatchEvent(changeEvent);
             failureCodeField.value = "FSSCONT";
