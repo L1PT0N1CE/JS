@@ -138,6 +138,13 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "COVERED";
             causeCodeField.dispatchEvent(changeEvent);
+        } else if(description.includes("aether")) {
+            problemCodeField.value = "ROBOTICS";
+            problemCodeField.dispatchEvent(changeEvent);
+            failureCodeField.value = "FSSCONT";
+            failureCodeField.dispatchEvent(changeEvent);
+            causeCodeField.value = "INTFAIL";
+            causeCodeField.dispatchEvent(changeEvent);
         } else if(description.includes("destacker") || description.includes("destaker") || description.includes("desktaker") || description.includes("destecker") || description.includes("distaker") || description.includes("stapel") || description.includes("stapler") || description.includes("lift") || description.includes("lifter")) {
             problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
