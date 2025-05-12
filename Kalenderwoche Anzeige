@@ -2,7 +2,7 @@
 // @name         Kalenderwoche Anzeige
 // @version      1.0
 // @description  Zeigt die aktuelle Kalenderwoche oben rechts auf www.xyz.de an
-// @author       Dein Name
+// @author       Kanataza
 // @match        https://www.google.com/*
 // @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @match        https://duckduckgo.com/*
