@@ -22,7 +22,7 @@
     function fillFields() {
         var fieldnameInput = document.querySelector('input[name="fieldname"]');
         if (fieldnameInput) {
-            fieldnameInput.value = "Work Order Status";
+            fieldnameInput.value = "Status";
             fieldnameInput.dispatchEvent(new Event('input', { bubbles: true }));
             simulateTab(fieldnameInput);
         }
