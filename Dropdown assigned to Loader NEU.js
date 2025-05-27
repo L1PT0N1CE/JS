@@ -17,16 +17,16 @@
 "USSAXEL",
 "ALTVAA",
 "KLIKEVI",
-"jSONSTA",
+"JSONSTA",
 "WAJDAILA",
 "KARAILY",
 "SCHMIDQD",
 "SHALSAMI",
 "ARWIESNE",
+"CHFGC",
 "CANCICEK",
 "DALDALCI",
 "SPRINOLI",
-"CHFGC",
       ];
 
   function filterTexts(input) {
