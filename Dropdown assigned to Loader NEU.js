@@ -26,6 +26,7 @@
 "CHFGC",
 "CANCICEK",
 "DALDALCI",
+"SCHAOUT"
 "SPRINOLI",
       ];
 
