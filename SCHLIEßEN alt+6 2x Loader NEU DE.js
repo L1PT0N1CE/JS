@@ -1,43 +1,76 @@
 // ==UserScript==
-// @name         SCHLIEßEN alt+6 2x Loader NEU DE
+// @name         SCHLIEßEN & ZUGEWIESEN kombiniert (Alt+5 / Alt+6)
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  Füllt felder aus
+// @version      1.0
+// @description  Füllt Felder aus: Alt+5 = Zugewiesen an, Alt+6 = Status Abgeschlossen
 // @author       Kanataza
 // @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
-// @icon         https://media.licdn.com/dms/image/D4E03AQGYEWJAKzMoHg/profile-displayphoto-shrink_800_800/0/1675186919356?e=2147483647&v=beta&t=yD2lwHTC78Y0eFQGGpl173y2Rhv9LmZgCe6LKvLYFvI
+// @icon         https://media.licdn.com/dms/image/D4E03AQGYEWJAKzMoHg/profile-displayphoto-shrink_800_800/0/1675186919356?e=2147483647&v=beta&t=yD0lwHTC78Y0eFQGGpl173y2Rhv9LmZgCe6LKvLYFvI
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    document.addEventListener('keydown', function(e) {
-        if (e.altKey && e.key === '6') {
+    document.addEventListener('keydown', function (e) {
+        if (e.altKey && e.key === '5') {
             e.preventDefault();
-            fillFields();
+            fillAssigned();
+        } else if (e.altKey && e.key === '6') {
+            e.preventDefault();
+            fillClosed();
         }
     });
 
-    function fillFields() {
-        var fieldnameInput = document.querySelector('input[name="fieldname"]');
+    function fillAssigned() {
+        const fieldnameInput = document.querySelector('input[name="fieldname"]');
+        if (fieldnameInput) {
+            const current = fieldnameInput.value;
+            if (current === "--Select Field--") {
+                fieldnameInput.value = "Assigned To";
+            } else if (current === "--Feld auswählen--") {
+                fieldnameInput.value = "Zugewiesen an";
+            }
+            fieldnameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            simulateTab(fieldnameInput);
+        }
+
+        const filtervalueInput = document.querySelector('input[name="filtervalue"]');
+        if (filtervalueInput) {
+            const savedLogin = localStorage.getItem('filtervalueLogin');
+            if (savedLogin) {
+                filtervalueInput.value = savedLogin;
+                filtervalueInput.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+                const login = prompt("Bitte geben Sie den Login ein:");
+                if (login) {
+                    localStorage.setItem('filtervalueLogin', login);
+                    filtervalueInput.value = login;
+                    filtervalueInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        }
+    }
+
+    function fillClosed() {
+        const fieldnameInput = document.querySelector('input[name="fieldname"]');
         if (fieldnameInput) {
             fieldnameInput.value = "Status";
             fieldnameInput.dispatchEvent(new Event('input', { bubbles: true }));
             simulateTab(fieldnameInput);
         }
 
-        var filtervalueInput = document.querySelector('input[name="filtervalue"]');
+        const filtervalueInput = document.querySelector('input[name="filtervalue"]');
         if (filtervalueInput) {
-            setTimeout(function() {
+            setTimeout(() => {
                 filtervalueInput.value = "Abgeschlossen";
                 filtervalueInput.dispatchEvent(new Event('input', { bubbles: true }));
-            }, 100); // Ein kurzer Timeout, um sicherzustellen, dass das Feld "fieldname" den Fokus verlassen hat
+            }, 100);
         }
     }
 
     function simulateTab(element) {
-        var tabEvent = new KeyboardEvent('keydown', {
+        const tabEvent = new KeyboardEvent('keydown', {
             key: 'Tab',
             keyCode: 9,
             code: 'Tab',
