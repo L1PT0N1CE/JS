@@ -1,15 +1,18 @@
 // ==UserScript==
-// @name        Dropdown Workorder Search Objects Loader NEU
-// @version     0.3
-// @description Füllt Textfelder mit vordefinierten Texten und dynamischen Vorschlägen basierend auf der Eingabe.
+// @name        APM DROPDOWNS
+// @namespace   https://phonetool.amazon.com/users/kanataza
+// @version     1.0
+// @description Alle Dropdowns für APM
 // @author      Kanataza
-// @match       aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
-// @icon        https://media.licdn.com/dms/image/D4E03AQGYEWJAKzMoHg/profile-displayphoto-shrink_800_800/0/1675186919356?e=2147483647&v=beta&t=yD2lwHTC78Y0eFQGGpl173y2Rhv9LmZgCe6LKvLYFvI
+// @match       https://eu1.eam.hxgnsmartcloud.com/*
+// @icon        https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
 // @grant       none
 // ==/UserScript==
 
-(function() {
-  const texts = [
+(function () {
+  const equipment_list = [
+"AR.ZONE.2.A",
+"AR.ZONE.3.A",
 "AR.ZONE.2.A.FID",
 "AR.ZONE.3.A.FID",
 "BOT.GDU.G3-NR-1601-034891",
@@ -2976,46 +2979,46 @@
 "BOT.GDU.G4-NR-1716-112205",
     "AR.ZONE.2.A.PODS",
     "AR.ZONE.3.A.PODS",
-    "AR.ZONE.2.A.STN.ARSAW.410.2375",
-    "AR.ZONE.2.A.STN.ARSAW.410.2373",
-    "AR.ZONE.2.A.STN.ARSAW.409.2369",
-    "AR.ZONE.2.A.STN.ARSAW.409.2368",
-    "AR.ZONE.2.A.STN.ARSAW.408.2364",
-    "AR.ZONE.2.A.STN.ARSAW.408.2362",
-    "AR.ZONE.2.A.STN.ARSAW.407.2356",
-    "AR.ZONE.2.A.STN.ARSAW.407.2354",
-    "AR.ZONE.2.A.STN.ARSAW.406.2350",
-    "AR.ZONE.2.A.STN.ARSAW.406.2349",
-    "AR.ZONE.2.A.STN.ARSAW.405.2342",
-    "AR.ZONE.2.A.STN.ARSAW.405.2341",
-    "AR.ZONE.2.A.STN.ARSAW.404.2337",
-    "AR.ZONE.2.A.STN.ARSAW.404.2335",
-    "AR.ZONE.2.A.STN.ARSAW.403.2332",
-    "AR.ZONE.2.A.STN.ARSAW.403.2330",
-    "AR.ZONE.2.A.STN.ARSAW.402.2320",
-    "AR.ZONE.2.A.STN.ARSAW.402.2319",
-    "AR.ZONE.2.A.STN.ARSAW.401.2315",
-    "AR.ZONE.2.A.STN.ARSAW.401.2314",
-    "AR.ZONE.2.A.STN.ARSAW.310.2114",
-    "AR.ZONE.2.A.STN.ARSAW.310.2112",
-    "AR.ZONE.2.A.STN.ARSAW.309.2119",
-    "AR.ZONE.2.A.STN.ARSAW.309.2117",
-    "AR.ZONE.2.A.STN.ARSAW.308.2127",
-    "AR.ZONE.2.A.STN.ARSAW.308.2126",
-    "AR.ZONE.2.A.STN.ARSAW.307.2135",
-    "AR.ZONE.2.A.STN.ARSAW.307.2134",
-    "AR.ZONE.2.A.STN.ARSAW.306.2141",
-    "AR.ZONE.2.A.STN.ARSAW.306.2139",
-    "AR.ZONE.2.A.STN.ARSAW.305.2149",
-    "AR.ZONE.2.A.STN.ARSAW.305.2147",
-    "AR.ZONE.2.A.STN.ARSAW.304.2154",
-    "AR.ZONE.2.A.STN.ARSAW.304.2153",
-    "AR.ZONE.2.A.STN.ARSAW.303.2160",
-    "AR.ZONE.2.A.STN.ARSAW.303.2158",
-    "AR.ZONE.2.A.STN.ARSAW.302.2170",
-    "AR.ZONE.2.A.STN.ARSAW.302.2169",
-    "AR.ZONE.2.A.STN.ARSAW.301.2175",
-    "AR.ZONE.2.A.STN.ARSAW.301.2174",
+    "AR.ZONE.2.A.STN.AW.410.2375",
+    "AR.ZONE.2.A.STN.AW.410.2373",
+    "AR.ZONE.2.A.STN.AW.409.2369",
+    "AR.ZONE.2.A.STN.AW.409.2368",
+    "AR.ZONE.2.A.STN.AW.408.2364",
+    "AR.ZONE.2.A.STN.AW.408.2362",
+    "AR.ZONE.2.A.STN.AW.407.2356",
+    "AR.ZONE.2.A.STN.AW.407.2354",
+    "AR.ZONE.2.A.STN.AW.406.2350",
+    "AR.ZONE.2.A.STN.AW.406.2349",
+    "AR.ZONE.2.A.STN.AW.405.2342",
+    "AR.ZONE.2.A.STN.AW.405.2341",
+    "AR.ZONE.2.A.STN.AW.404.2337",
+    "AR.ZONE.2.A.STN.AW.404.2335",
+    "AR.ZONE.2.A.STN.AW.403.2332",
+    "AR.ZONE.2.A.STN.AW.403.2330",
+    "AR.ZONE.2.A.STN.AW.402.2320",
+    "AR.ZONE.2.A.STN.AW.402.2319",
+    "AR.ZONE.2.A.STN.AW.401.2315",
+    "AR.ZONE.2.A.STN.AW.401.2314",
+    "AR.ZONE.2.A.STN.AW.310.2114",
+    "AR.ZONE.2.A.STN.AW.310.2112",
+    "AR.ZONE.2.A.STN.AW.309.2119",
+    "AR.ZONE.2.A.STN.AW.309.2117",
+    "AR.ZONE.2.A.STN.AW.308.2127",
+    "AR.ZONE.2.A.STN.AW.308.2126",
+    "AR.ZONE.2.A.STN.AW.307.2135",
+    "AR.ZONE.2.A.STN.AW.307.2134",
+    "AR.ZONE.2.A.STN.AW.306.2141",
+    "AR.ZONE.2.A.STN.AW.306.2139",
+    "AR.ZONE.2.A.STN.AW.305.2149",
+    "AR.ZONE.2.A.STN.AW.305.2147",
+    "AR.ZONE.2.A.STN.AW.304.2154",
+    "AR.ZONE.2.A.STN.AW.304.2153",
+    "AR.ZONE.2.A.STN.AW.303.2160",
+    "AR.ZONE.2.A.STN.AW.303.2158",
+    "AR.ZONE.2.A.STN.AW.302.2170",
+    "AR.ZONE.2.A.STN.AW.302.2169",
+    "AR.ZONE.2.A.STN.AW.301.2175",
+    "AR.ZONE.2.A.STN.AW.301.2174",
     "AR.ZONE.2.A.STN.UNIV.2474",
     "AR.ZONE.2.A.STN.UNIV.2472",
     "AR.ZONE.2.A.STN.UNIV.2470",
@@ -3180,45 +3183,45 @@
     "AR.ZONE.3.A.STN.UNIV.3109",
     "AR.ZONE.3.A.STN.UNIV.3108",
     "AR.ZONE.3.A.STN.UNIV.3106",
-    "AR.ZONE.3.A.STN.ARSAW.610.3372",
-    "AR.ZONE.3.A.STN.ARSAW.610.3371",
-    "AR.ZONE.3.A.STN.ARSAW.609.3367",
-    "AR.ZONE.3.A.STN.ARSAW.609.3366",
-    "AR.ZONE.3.A.STN.ARSAW.608.3362",
-    "AR.ZONE.3.A.STN.ARSAW.608.3360",
-    "AR.ZONE.3.A.STN.ARSAW.607.3354",
-    "AR.ZONE.3.A.STN.ARSAW.607.3352",
-    "AR.ZONE.3.A.STN.ARSAW.606.3348",
-    "AR.ZONE.3.A.STN.ARSAW.606.3346",
-    "AR.ZONE.3.A.STN.ARSAW.605.3340",
-    "AR.ZONE.3.A.STN.ARSAW.605.3339",
-    "AR.ZONE.3.A.STN.ARSAW.604.3334",
-    "AR.ZONE.3.A.STN.ARSAW.604.3333",
-    "AR.ZONE.3.A.STN.ARSAW.603.3329",
-    "AR.ZONE.3.A.STN.ARSAW.603.3328",
-    "AR.ZONE.3.A.STN.ARSAW.602.3318",
-    "AR.ZONE.3.A.STN.ARSAW.602.3317",
-    "AR.ZONE.3.A.STN.ARSAW.601.3312",
-    "AR.ZONE.3.A.STN.ARSAW.601.3311",
-    "AR.ZONE.3.A.STN.ARSAW.510.3114",
-    "AR.ZONE.3.A.STN.ARSAW.510.3112",
-    "AR.ZONE.3.A.STN.ARSAW.509.3119",
-    "AR.ZONE.3.A.STN.ARSAW.509.3117",
-    "AR.ZONE.3.A.STN.ARSAW.508.3127",
-    "AR.ZONE.3.A.STN.ARSAW.508.3126",
-    "AR.ZONE.3.A.STN.ARSAW.507.3135",
-    "AR.ZONE.3.A.STN.ARSAW.507.3134",
-    "AR.ZONE.3.A.STN.ARSAW.506.3141",
-    "AR.ZONE.3.A.STN.ARSAW.505.3148",
-    "AR.ZONE.3.A.STN.ARSAW.505.3147",
-    "AR.ZONE.3.A.STN.ARSAW.504.3154",
-    "AR.ZONE.3.A.STN.ARSAW.504.3153",
-    "AR.ZONE.3.A.STN.ARSAW.503.3160",
-    "AR.ZONE.3.A.STN.ARSAW.503.3159",
-    "AR.ZONE.3.A.STN.ARSAW.502.3170",
-    "AR.ZONE.3.A.STN.ARSAW.502.3169",
-    "AR.ZONE.3.A.STN.ARSAW.501.3175",
-    "AR.ZONE.3.A.STN.ARSAW.501.3174",
+    "AR.ZONE.3.A.STN.AW.610.3372",
+    "AR.ZONE.3.A.STN.AW.610.3371",
+    "AR.ZONE.3.A.STN.AW.609.3367",
+    "AR.ZONE.3.A.STN.AW.609.3366",
+    "AR.ZONE.3.A.STN.AW.608.3362",
+    "AR.ZONE.3.A.STN.AW.608.3360",
+    "AR.ZONE.3.A.STN.AW.607.3354",
+    "AR.ZONE.3.A.STN.AW.607.3352",
+    "AR.ZONE.3.A.STN.AW.606.3348",
+    "AR.ZONE.3.A.STN.AW.606.3346",
+    "AR.ZONE.3.A.STN.AW.605.3340",
+    "AR.ZONE.3.A.STN.AW.605.3339",
+    "AR.ZONE.3.A.STN.AW.604.3334",
+    "AR.ZONE.3.A.STN.AW.604.3333",
+    "AR.ZONE.3.A.STN.AW.603.3329",
+    "AR.ZONE.3.A.STN.AW.603.3328",
+    "AR.ZONE.3.A.STN.AW.602.3318",
+    "AR.ZONE.3.A.STN.AW.602.3317",
+    "AR.ZONE.3.A.STN.AW.601.3312",
+    "AR.ZONE.3.A.STN.AW.601.3311",
+    "AR.ZONE.3.A.STN.AW.510.3114",
+    "AR.ZONE.3.A.STN.AW.510.3112",
+    "AR.ZONE.3.A.STN.AW.509.3119",
+    "AR.ZONE.3.A.STN.AW.509.3117",
+    "AR.ZONE.3.A.STN.AW.508.3127",
+    "AR.ZONE.3.A.STN.AW.508.3126",
+    "AR.ZONE.3.A.STN.AW.507.3135",
+    "AR.ZONE.3.A.STN.AW.507.3134",
+    "AR.ZONE.3.A.STN.AW.506.3141",
+    "AR.ZONE.3.A.STN.AW.505.3148",
+    "AR.ZONE.3.A.STN.AW.505.3147",
+    "AR.ZONE.3.A.STN.AW.504.3154",
+    "AR.ZONE.3.A.STN.AW.504.3153",
+    "AR.ZONE.3.A.STN.AW.503.3160",
+    "AR.ZONE.3.A.STN.AW.503.3159",
+    "AR.ZONE.3.A.STN.AW.502.3170",
+    "AR.ZONE.3.A.STN.AW.502.3169",
+    "AR.ZONE.3.A.STN.AW.501.3175",
+    "AR.ZONE.3.A.STN.AW.501.3174",
     "AFE3.5.1.DIS.LN.01.1073.21.01",
 "AFE3.5.1.DIS.LN.01.1073.21.02",
 "AFE3.5.1.DIS.LN.01.1073.21.03",
@@ -10742,22 +10745,78 @@
 "CARRIER.SC.1500.01.647",
 "CARRIER.SC.1500.01.648",
 "CARRIER.SC.1500.01.649",
-"CARRIER.SC.1500.01.650",
-    
-        ];
+"CARRIER.SC.1500.01.650"
+  ];
 
- function filterTexts(input) {
-    return texts.filter(text => text.toLowerCase().startsWith(input.toLowerCase()));
+  const config = {
+    ff_description: [
+      "AR",
+      "fido",
+      "charger",
+      "omni",
+      "Clean",
+      "Alu",
+      "[",
+      "drive",
+      "scrubber"
+    ],
+
+    equipment: equipment_list,
+    ff_equipmentno: equipment_list,
+    ff_equipment: equipment_list,
+
+    ff_workorderstatus_display: [
+      "On Hold",
+      "In Progress",
+      "Open",
+      "Remedy Request"
+    ],
+
+    ff_assignedto: [
+      "KANATAZA",
+      "IVELIK",
+      "HSSHIMEN",
+      "RMALOGOR",
+      "USSAXEL",
+      "KLIKEVI",
+      "JSONSTA",
+      "LUGEJASO",
+      "KEDAMA",
+      "SCHMIDQD",
+      "IONELVIC",
+      "SHALSAMI",
+      "CHFGC",
+      "DALDALCI",
+      "FLOOO",
+      "SPRINOLI"
+    ],
+    ff_shift: [
+      "FA73",
+      "FA71",
+      "FA72",
+      "FA74"
+    ],
+    wspf_10_com_descript: [
+      "Safety Tip",
+      "Success Story",
+      "VDL Top Tech Issue",
+      "Additional VDL Information",
+      "AR Top Tech Issue",
+      "AR Additional Information"
+    ]
+  };
+
+  function filterTexts(input, list) {
+    return list.filter(text => text.toLowerCase().includes(input.toLowerCase()));
   }
 
-  function autofill(element) {
-    // Löschen des voreingestellten Werts
-    if (element.value === "REMEDY.FACILITIES") {
+  function autofill(element, list) {
+    if (element.getAttribute("name") === "equipment" && element.value === "REMEDY.FACILITIES") {
       element.value = "";
     }
 
     const input = element.value;
-    const filteredTexts = filterTexts(input);
+    const filteredTexts = filterTexts(input, list);
 
     const datalistId = "autocomplete-suggestions";
     let dropdown = document.getElementById(datalistId);
@@ -10774,19 +10833,16 @@
       dropdown.appendChild(option);
     }
 
-    element.setAttribute("list", datalistId);
-  }
-
-  function isTargetInput(element) {
-    return element.getAttribute("name") === "ff_equipment";
-  }
-
-  function handleFocus(event) {
-    const element = event.target;
-    if (isTargetInput(element)) {
-      autofill(element);
+    if (!element.getAttribute("list")) {
+      element.setAttribute("list", datalistId);
     }
   }
 
-  document.addEventListener("focusin", handleFocus);
+  document.addEventListener("focusin", function (event) {
+    const element = event.target;
+    const name = element.getAttribute("name");
+    if (name && config[name]) {
+      autofill(element, config[name]);
+    }
+  });
 })();
