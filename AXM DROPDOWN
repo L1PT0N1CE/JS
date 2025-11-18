@@ -19820,15 +19820,7 @@
 
   const config = {
     ff_description: [
-      "",
-      "fido",
-      "charger",
-      "omni",
-      "Clean",
-      "Alu",
-      "[",
-      "drive",
-      "scrubber"
+      "["
     ],
 
     equipment: equipment_list,
