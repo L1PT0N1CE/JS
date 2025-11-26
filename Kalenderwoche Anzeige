@@ -32,12 +32,12 @@
             kwElement.id = 'kw-display';
             kwElement.style.position = 'fixed';
             kwElement.style.top = '10px';
-            kwElement.style.right = '10px';
+            kwElement.style.right = '390px';
             kwElement.style.background = 'rgba(0, 0, 0, 0.7)';
             kwElement.style.color = 'white';
             kwElement.style.padding = '5px 10px';
             kwElement.style.borderRadius = '5px';
-            kwElement.style.fontSize = '14px';
+            kwElement.style.fontSize = '17px';
             kwElement.style.zIndex = '1000';
             document.body.appendChild(kwElement);
         }
