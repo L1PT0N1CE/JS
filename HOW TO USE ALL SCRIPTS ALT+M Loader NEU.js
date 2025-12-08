@@ -57,12 +57,13 @@
     var modalContent = document.createElement('div');
     modalContent.innerHTML = `
         <h2>xyz Script Instructions</h2>
-        <p>ALT+1 = Fills out the Checklist/Füllt Checkliste aus</p>
-        <p>ALT+2 = Remove the check on the Checklist/Entfernt das abgehakte in der Checkliste</p>
-        <p>ALT+3 = Fills out the Record View in a WO for Tickets/Füllt Datenansicht automatisch aus</p>
-        <p>ALT+4 = Opens a Window for Time booking/Öffnet ein Fenster zum Zeiten buchen (buggy/Fehlerhaft)</p>
-        <p>ALT+5 = by right-clicking on the work order (field update) you have to click 2x ALT+5 so that “assigned to” is filled in</p>
-        <p>ALT+6 = Same way like ALT+5 but it fills the Workorder Status to "Completed"</p>
+        <p>ALT+1 = Füllt LINKE Checkliste aus</p>
+        <p>ALT+2 = Füllt RECHTE Checkliste aus</p>
+        <p>ALT+X = Entfernt die komplette Checkliste</p>
+        <p>ALT+3 = Füllt Workorder aus. VORSICHT BEI PROBLEMCODES</p>
+        <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
+        <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte wo an dich</p>
+        <p>ALT+6 = 2x drücken schließt die mit rechtsklcik angewählte WO</p>
         <h3>To open and close this Window press ALT+M</h3>
     `;
     modalContainer.appendChild(modalContent);
@@ -122,3 +123,4 @@
         }
     });
 })();
+
