@@ -56,7 +56,7 @@
     // Create the content of the modal
     var modalContent = document.createElement('div');
     modalContent.innerHTML = `
-        <h2>xyz Script Instructions</h2>
+        <h2>Azad's Script Instructions</h2>
         <p>ALT+1 = Füllt LINKE Checkliste aus</p>
         <p>ALT+2 = Füllt RECHTE Checkliste aus</p>
         <p>ALT+X = Entfernt die komplette Checkliste</p>
@@ -64,7 +64,7 @@
         <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
         <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte wo an dich</p>
         <p>ALT+6 = 2x drücken schließt die mit rechtsklcik angewählte WO</p>
-        <h3>To open and close this Window press ALT+M</h3>
+        <h3>Zum öffnen und schließen ***ALT+M***</h3>
     `;
     modalContainer.appendChild(modalContent);
 
@@ -123,4 +123,5 @@
         }
     });
 })();
+
 
