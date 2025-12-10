@@ -4,8 +4,8 @@
 // @version       1.2
 // @description   All what you need honey
 // @author        kanataza
-// @match         https://eu1.eam.hxgnsmartcloud.com/*
-// @match         https://us1.eam.hxgnsmartcloud.com/*
+// @match         aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
+// @match         aHR0cHM6Ly91czEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @icon          https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://code.jquery.com/ui/1.12.1/jquery-ui.min.js
@@ -477,4 +477,5 @@
 
     fillDatework();
     setInterval(fillDatework, 60 * 60 * 1000);
+
 })();
