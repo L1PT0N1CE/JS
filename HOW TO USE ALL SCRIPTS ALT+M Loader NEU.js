@@ -2,7 +2,7 @@
 // @name         HOW TO USE ALL SCRIPTS ALT+M Loader NEU
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  Displays a box with specific instructions on scripts
+// @description  Zeigt ein Fenster wie man scripte nutzt
 // @author       Kanataza
 // @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @grant        none
@@ -123,5 +123,4 @@
         }
     });
 })();
-
 
