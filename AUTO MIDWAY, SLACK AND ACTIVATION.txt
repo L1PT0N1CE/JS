@@ -5,9 +5,9 @@
 // @description  auto-activation, auto-login, and auto-key-entering (login)
 // @author       Kanataza
 // @icon         https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
-// @match        https://activate.amazon-corp.com/*
-// @match        https://amazon.enterprise.slack.com/*
-// @match        https://midway-auth.amazon.com/*
+// @match        aHR0cHM6Ly9hY3RpdmF0ZS5hbWF6b24tY29ycC5jb20vKg==
+// @match        aHR0cHM6Ly9hbWF6b24uZW50ZXJwcmlzZS5zbGFjay5jb20vKg==
+// @match        aHR0cHM6Ly9taWR3YXktYXV0aC5hbWF6b24uY29tLyo=
 // @grant        none
 // ==/UserScript==
 
@@ -146,4 +146,5 @@ function handleMidwayAuth() {
     if (url.includes('activate.amazon-corp.com')) handleAmazonActivation();
     else if (url.includes('amazon.enterprise.slack.com')) handleSlackLogin();
     else if (url.includes('midway-auth.amazon.com')) handleMidwayAuth();
+
 })();
