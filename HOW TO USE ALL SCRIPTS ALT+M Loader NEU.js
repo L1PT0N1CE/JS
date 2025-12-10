@@ -4,7 +4,7 @@
 // @version      1.0
 // @description  Zeigt ein Fenster wie man scripte nutzt
 // @author       Kanataza
-// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
+// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8q
 // @grant        none
 // @icon         https://media.licdn.com/dms/image/D4E03AQGYEWJAKzMoHg/profile-displayphoto-shrink_800_800/0/1675186919356?e=2147483647&v=beta&t=yD2lwHTC78Y0eFQGGpl173y2Rhv9LmZgCe6LKvLYFvI
 
@@ -123,4 +123,5 @@
         }
     });
 })();
+
 
