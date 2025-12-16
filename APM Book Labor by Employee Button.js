@@ -88,26 +88,25 @@
         const f3 = document.querySelector('input[name="boodescription"]');
         const f4 = document.querySelector('input[name="datework"]');
 
-        function setField(el, val) {
-            if (!el) return;
-            el.focus();
-            const clickEvt = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: window,
-                button: 0,
-                buttons: 1
-            });
-            el.dispatchEvent(clickEvt);
+function setField(el, val) {
+    if (!el) return;
+    el.focus();
+    const clickEvt = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        buttons: 1
+    });
+    el.dispatchEvent(clickEvt);
 
-            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                window.HTMLInputElement.prototype, 'value'
-            ).set;
-            nativeInputValueSetter.call(el, val);
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype, 'value'
+    ).set;
+    nativeInputValueSetter.call(el, val);
 
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+}
 
         setField(f1, type);
         setField(f4, getCurrentDate());
@@ -183,3 +182,4 @@
     obs.observe(document.body, { childList: true, subtree: true });
     addMainButton();
 })();
+
