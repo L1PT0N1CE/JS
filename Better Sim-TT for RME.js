@@ -223,9 +223,6 @@ function getWorkOrderNumber() {
         if (/\blifter\b/.test(title))
             return 'We restarted the lifter. The Station is operational again.\nBest regards.';
 
-        if (/\baether\b|\bno comms\b/.test(title))
-            return 'Aether on Floor2 is still not Activ in FRA7 yet because of Missing KNX Connection.\nBest regards.';
-
         if (/\bdestacker\b|\bdestucker\b|\bdesticker\b|\bdestaker\b|\bdestecker\b|\bdesteker\b|\bdasticker\b/.test(title))
             return 'We restarted the Stacker. The Station is operational again.\nBest regards.';
 
@@ -251,7 +248,7 @@ function getWorkOrderNumber() {
             return 'We fixed the Fido. The Station is operational again.\nBest regards.';
 
         if (/\bestop\b|\be-stop\b|\bfloor stopped\b/.test(title))
-            return 'We removed the E-Stop. The Floor is operational again.\nBest regards.';
+            return 'We fixed the E-Stop. The Floor is operational again.\nBest regards.';
 
         if (/\blow confidence\b/.test(title))
             return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
@@ -281,3 +278,4 @@ function getWorkOrderNumber() {
         }
     });
 })();
+
