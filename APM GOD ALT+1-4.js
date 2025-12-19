@@ -18,7 +18,7 @@
     // APM Book Times ALT+4 Editable
     const $ = jQuery.noConflict(true);
 
-    const DEFAULT_HOURS = ["0,1", "0,25", "0,5", "0,75", "1", "1,25", "1,5", "2", "2,5", "3"];
+    const DEFAULT_HOURS = ["0,1", "0,25", "0,5", "0,75", "1", "1,25", "1,5", "2", "2,5", "3", "-0,25", "-0,5", "-0,75", "-1"];
 
     function getSavedNames() {
         const data = localStorage.getItem("customNames");
@@ -253,7 +253,7 @@
         shiftField.dispatchEvent(changeEvent);
 
         // Decision logic for problem, failure, and cause codes based on description
-        if (description.includes("release pod button") || description.includes("release button") || description.includes("restart") ||description.includes("frozen") || description.includes("cognex") || description.includes("beamer") || description.includes("magenta") || description.includes("ODS") || description.includes("neustart") || description.includes("reboot") || description.includes("restart") || description.includes("rgb") || description.includes("cam") || description.includes("camera") || description.includes("computer") || description.includes("neustart") || description.includes("connection") || description.includes("reset") || description.includes("restart") || description.includes("screen") || description.includes("ton") || description.includes("sound") || description.includes("beep") || description.includes("scan") || description.includes("projector") || description.includes("cognex") || description.includes("head") || description.includes("hand") || description.includes("scanner") || description.includes("abmelden") || description.includes("projektor") || description.includes("button") || description.includes("vest") || description.includes("weste") || description.includes("racklichter") || description.includes("display") || description.includes("monitor") || description.includes("bildschirm") || description.includes("racklights") || description.includes("screen") || description.includes("autorack") || description.includes("rack") || description.includes("ids") || description.includes("fido") || description.includes("screen")) {
+        if (description.includes("release pod button") || description.includes("release button") || description.includes("restart") ||description.includes("frozen") || description.includes("cognex") || description.includes("beamer") || description.includes("magenta") || description.includes("ODS") || description.includes("neustart") || description.includes("reboot") || description.includes("restart") || description.includes("rgb") || description.includes("cam") || description.includes("camera") || description.includes("computer") || description.includes("neustart") || description.includes("connection") || description.includes("reset") || description.includes("restart") || description.includes("screen") || description.includes("ton") || description.includes("sound") || description.includes("beep") || description.includes("scan") || description.includes("projector") || description.includes("cognex") || description.includes("head") || description.includes("hand") || description.includes("scanner") || description.includes("abmelden") || description.includes("projektor") || description.includes("button") || description.includes("ranklight") || description.includes("vest") || description.includes("weste") || description.includes("racklichter") || description.includes("display") || description.includes("monitor") || description.includes("bildschirm") || description.includes("racklights") || description.includes("screen") || description.includes("autorack") || description.includes("rack") || description.includes("ids") || description.includes("fido") || description.includes("screen")) {
             problemCodeField.value = "CONT";
             problemCodeField.dispatchEvent(changeEvent);
             failureCodeField.value = "NETWORK";
@@ -479,3 +479,4 @@
     setInterval(fillDatework, 60 * 60 * 1000);
 
 })();
+
