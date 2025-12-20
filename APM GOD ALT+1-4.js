@@ -344,7 +344,7 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "COVERED";
             causeCodeField.dispatchEvent(changeEvent);
-        } else if (description.includes("destacker") || description.includes("destaker") || description.includes("desktaker") || description.includes("destecker") || description.includes("desteker") || description.includes("distaker") || description.includes("stapel") || description.includes("stapler") || description.includes("lift") || description.includes("lifter")) {
+        } else if (description.includes("destacker") || description.includes("destaker") || description.includes("dastaker") || description.includes("desktaker") || description.includes("destecker") || description.includes("desteker") || description.includes("distaker") || description.includes("stapel") || description.includes("stapler") || description.includes("lift") || description.includes("lifter")) {
             problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
             failureCodeField.value = "PE";
@@ -479,4 +479,5 @@
     setInterval(fillDatework, 60 * 60 * 1000);
 
 })();
+
 
