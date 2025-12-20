@@ -217,7 +217,7 @@ function getWorkOrderNumber() {
     function getResponseTextFromTitle(title) {
         title = title.toLowerCase();
 
-        if (/\bracklight\b|\bracklights\b|\branklight\b|\bbrack\b/.test(title))
+        if (/\bracklight\b|\bracklights\b|\bRanklight\b|\bbrack\b/.test(title))
             return 'We restarted the Racklight/Rack. The Station is operational again.\nBest regards.';
 
         if (/\blifter\b/.test(title))
@@ -278,6 +278,7 @@ function getWorkOrderNumber() {
         }
     });
 })();
+
 
 
 
