@@ -214,54 +214,59 @@ function getWorkOrderNumber() {
         $('.sim-communicationActions--addCommentButton').click();
     }
 
-function getResponseTextFromTitle(title) {
-    if (/\b(racklight|racklights|ranklights|rank|rack)\b/i)
-        return 'We restarted the Racklight/Rack. The Station is operational again.\nBest regards.';
+    function getResponseTextFromTitle(title) {
+        title = title.toLowerCase();
 
-    if (/\blifter\b/i)
-        return 'We restarted the lifter. The Station is operational again.\nBest regards.';
+        if (/\bracklight\b|\bracklights\b|\brack lights\b|\branklights\b|\brack\b/.test(title))
+            return 'We restarted the Racklight/Rack. The Station is operational again.\nBest regards.';
 
-    if (/\b(destacker|destucker|desticker|destaker|dastaker|destecker|desteker|dasticker)\b/i)
-        return 'We restarted the Stacker. The Station is operational again.\nBest regards.';
+        if (/\blifter\b/.test(title))
+            return 'We restarted the lifter. The Station is operational again.\nBest regards.';
 
-    if (/\bfiducial\b/i)
-        return 'We replaced the Fiducial. The Floor is operational again.\nBest regards.';
+        if (/\baether\b|\bno comms\b/.test(title))
+            return 'Aether on Floor2 is still not Activ in FRA7 yet because of Missing KNX Connection.\nBest regards.';
 
-    if (/\bids\b/i)
-        return 'We restarted the IDS. The Station is operational again.\nBest regards.';
+        if (/\bdestacker\b|\bdestucker\b|\bdesticker\b|\bdestaker\b|\bdastaker\b|\bdestecker\b|\bdesteker\b|\bdasticker\b/.test(title))
+            return 'We restarted the Stacker. The Station is operational again.\nBest regards.';
 
-    if (/\b(outbound|conveyor|conveyer|high control)\b/i)
-        return 'We removed the Jam. The Conveyor is operational again.\nBest regards.';
+        if (/\bfiducial\b/.test(title))
+            return 'We replaced the Fiducial. The Floor is operational again.\nBest regards.';
 
-    if (/\b(pod|bin)\b/i)
-        return 'We cleaned the POD. The POD is operational again.\nBest regards.';
+        if (/\bids\b/.test(title))
+            return 'We restarted the IDS. The Station is operational again.\nBest regards.';
 
-    if (/\b(bildschirm|screen|restart|neustart|reboot|verbindung|monitor|computer|reset)\b/i)
-        return 'We restarted the System. The Station is operational again.\nBest regards.';
+        if (/\boutbound\b|\bconvey(or|er)\b|\bhigh control\b/.test(title))
+            return 'We removed the Jam. The Conveyor is operational again.\nBest regards.';
 
-    if (/\b(liquid|ausgelaufen|spill)\b/i)
-        return 'We cleaned the Area/Floor. The Area/Floor is operational again.\nBest regards.';
+        if (/\bpod\b|\bbin\b/.test(title))
+            return 'We cleaned the POD. The POD is operational again.\nBest regards.';
 
-    if (/\b(fido|alarm)\b/i)
-        return 'We fixed the Fido. The Station is operational again.\nBest regards.';
+        if (/\bbildschirm\b|\bscreen\b|\brestart\b|\bneustart\b|\breboot\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
+            return 'We restarted the System. The Station is operational again.\nBest regards.';
 
-    if (/\b(estop|e-stop|floor stopped)\b/i)
-        return 'We fixed the E-Stop. The Floor is operational again.\nBest regards.';
+        if (/\bliquid\b|\bausgelaufen\b|\bspill\b/.test(title))
+            return 'We cleaned the Area/Floor. The Area/Floor is operational again.\nBest regards.';
 
-    if (/\blow confidence\b/i)
-        return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
+        if (/\bfido\b|\balarm\b/.test(title))
+            return 'We fixed the Fido. The Station is operational again.\nBest regards.';
 
-    if (/\bdepal\b/i)
-        return 'We fixed the Jam/Crash on the Depal. The Depaletizer is operational again.\nBest regards.';
+        if (/\bestop\b|\be-stop\b|\bfloor stopped\b/.test(title))
+            return 'We removed the E-Stop. The Floor is operational again.\nBest regards.';
 
-    if (/\bladder\b/i)
-        return 'We fixed the Ladder. The Ladder is operational again.\nBest regards.';
+        if (/\blow confidence\b/.test(title))
+            return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
 
-    if (/\b(drive|du)\b/i)
-        return 'We fixed the Drive. The Drive is operational again.\nBest regards.';
+        if (/\bdepal\b/.test(title))
+            return 'We fixed the Jam/Crash on the Depal. The Depaletizer is operational again.\nBest regards.';
 
-    return 'The Station, Drive, Charger, Floor, Pod, Conveyance, Area, is operational again.\nBest regards.';
-}
+        if (/\bladder\b/.test(title))
+            return 'We fixed Ladder. The Ladder is operational again.\nBest regards.';
+
+        if (/\bdrive\b|\bdu\b/.test(title))
+            return 'We fixed the Drive. The Drive operational again.\nBest regards.';
+
+        return 'The Station, Drive, Charger, Floor, Pod, Conveyance, Area, is operational again.\nBest regards.';
+    }
 
     $(document).keydown(function (event) {
         if (event.altKey && event.keyCode === 51) {
@@ -276,8 +281,3 @@ function getResponseTextFromTitle(title) {
         }
     });
 })();
-
-
-
-
-
