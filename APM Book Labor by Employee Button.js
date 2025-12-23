@@ -5,7 +5,7 @@
 // @description  Button + Modal + Editable Time/Text + real left-click simulation (MET / ADM / T) – liest Login aus localStorage
 // @icon         https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
 // @author       kanataza
-// @match        https://eu1.eam.hxgnsmartcloud.com/*
+// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
 // @grant        none
 // ==/UserScript==
 
@@ -182,4 +182,5 @@ function setField(el, val) {
     obs.observe(document.body, { childList: true, subtree: true });
     addMainButton();
 })();
+
 
