@@ -62,9 +62,9 @@
         <p>ALT+X = Entfernt die komplette Checkliste</p>
         <p>ALT+3 = Füllt Workorder aus. VORSICHT BEI PROBLEMCODES</p>
         <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
-        <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte wo an dich</p>
+        <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte WO an dich</p>
         <p>ALT+6 = 2x drücken schließt die mit rechtsklcik angewählte WO</p>
-        <p>ALT+C = Vorlage für FWO Comments (KOMMENTARFENSTER ÖFFNEN MIT DER MAUS WO ANDERS DRÜCKEN und DANACH ALT+C)</p>
+        <p>ALT+C = Vorlage für FWO Comments. KOMMENTARFENSTER ÖFFNEN MIT DER MAUS WO ANDERS DRÜCKEN und DANACH ALT+C)</p>
         <h3>Zum öffnen und schließen ***ALT+M***</h3>
     `;
     modalContainer.appendChild(modalContent);
@@ -124,6 +124,7 @@
         }
     });
 })();
+
 
 
 
