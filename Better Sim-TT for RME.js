@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         Better Sim-TT for RME
-// @namespace    https://phonetool.amazon.com/users/kanataza
-// @version      2.4
-// @description  Combines Auto Refresher, Copy TT Link, WO Number & Open WO Link, and Correspondence Alt+3 Alt+4
+// @namespace    https://phonetool.amazon.com/users/kanataza 
+// @version      2.5
+// @description  Combines Auto Refresher, Copy TT Link, WO Number & Open WO Link, Correspondence Alt+3 Alt+4, and Assign to Me Alt+2
 // @author       Kanataza
 // @match        https://t.corp.amazon.com/*
-// @icon         https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
+// @icon         https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU 
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_setClipboard
-// @require      https://code.jquery.com/jquery-3.6.0.min.js
+// @require      https://code.jquery.com/jquery-3.6.0.min.js 
 // @run-at       document-end
 // ==/UserScript==
 
@@ -117,6 +117,33 @@
         if (event.altKey && event.key === '1') handleRefresherInput();
     });
 
+    // ==================== Assign to Me (Alt+2) ====================
+    
+    function assignToMe() {
+        const assigneeTrigger = document.querySelector('div[aria-label^="Assignee options"]');
+        
+        if (assigneeTrigger) {
+            assigneeTrigger.click();
+
+            // Warte auf das Dropdown und klicke "Me"
+            let attempts = 0;
+            const interval = setInterval(() => {
+                attempts++;
+                const meButton = document.querySelector('button[data-id="me"]');
+                
+                if (meButton) {
+                    meButton.click();
+                    clearInterval(interval);
+                } else if (attempts > 10) {
+                    clearInterval(interval);
+                    console.log('Assign to Me: Button nicht gefunden');
+                }
+            }, 50);
+        } else {
+            console.log('Assign to Me: Dropdown nicht gefunden');
+        }
+    }
+
     // ==================== Copy Buttons ====================
 
     function copyTitleAndURL() {
@@ -128,31 +155,28 @@
         btn.style.backgroundColor = 'yellow';
     }
 
-    // FIXED FUNCTION
-function getWorkOrderNumber() {
+    function getWorkOrderNumber() {
+        // --- 1. Neue Variante: offizieller EAM-Link ---
+        const woLink = document.querySelector('a[href*="workordernum="]');
+        if (woLink) {
+            const match = woLink.href.match(/workordernum=(\d+)/);
+            if (match) return match[1];
+        }
 
+        // --- 2. Comment-Card (<strong>1050...</strong>) ---
+        for (const strong of document.querySelectorAll('.sim-commentCardPrimary strong')) {
+            const text = strong.textContent.trim();
+            if (/^\d{8,}$/.test(text)) return text;
+        }
 
-    // --- 1. Neue Variante: offizieller EAM-Link ---
-    const woLink = document.querySelector('a[href*="workordernum="]');
-    if (woLink) {
-        const match = woLink.href.match(/workordernum=(\d+)/);
-        if (match) return match[1];
+        // --- 3. Alte Legacy-Variante (alte Tickets) ---
+        const legacyMatch = document.body.innerText.match(
+            /(?:work order number:|EAM\(APM\) work order number:)\s*(\d+)/i
+        );
+        if (legacyMatch) return legacyMatch[1];
+
+        return null;
     }
-
-    // --- 2. Comment-Card (<strong>1050...</strong>) ---
-    for (const strong of document.querySelectorAll('.sim-commentCardPrimary strong')) {
-        const text = strong.textContent.trim();
-        if (/^\d{8,}$/.test(text)) return text;
-    }
-
-    // --- 3. Alte Legacy-Variante (alte Tickets) ---
-    const legacyMatch = document.body.innerText.match(
-        /(?:work order number:|EAM\(APM\) work order number:)\s*(\d+)/i
-    );
-    if (legacyMatch) return legacyMatch[1];
-
-    return null;
-}
 
     function copyWorkOrderNumber() {
         const wo = getWorkOrderNumber();
@@ -268,14 +292,24 @@ function getWorkOrderNumber() {
         return 'The Station, Drive, Charger, Floor, Pod, Conveyance, Area, is operational again.\nBest regards.';
     }
 
+    // ==================== Keyboard Shortcuts ====================
+    
     $(document).keydown(function (event) {
-        if (event.altKey && event.keyCode === 51) {
+        // Alt+2: Assign to Me
+        if (event.altKey && (event.key === '2' || event.keyCode === 50)) {
+            event.preventDefault();
+            assignToMe();
+        }
+        // Alt+3: Standard Response "Received"
+        else if (event.altKey && event.keyCode === 51) {
             fillAndSubmitResponse(
                 'Hello,\n' +
                 'the RME team has received your ticket and will process your request as soon as possible.\n' +
                 'Best regards.'
             );
-        } else if (event.altKey && event.keyCode === 52) {
+        }
+        // Alt+4: Smart Response based on Title
+        else if (event.altKey && event.keyCode === 52) {
             const titleText = $('#sim-title').text();
             fillAndSubmitResponse(getResponseTextFromTitle(titleText));
         }
