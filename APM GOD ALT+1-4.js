@@ -288,12 +288,19 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "DIRTY";
             causeCodeField.dispatchEvent(changeEvent);
-        } else if (description.includes("turntable") || description.includes("wheel") || description.includes("caster")) {
+        } else if (description.includes("turntable") || description.includes("caster")) {
             problemCodeField.value = "ROBOTICS";
             problemCodeField.dispatchEvent(changeEvent);
             failureCodeField.value = "DUMECH";
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "DAMAGED";
+            causeCodeField.dispatchEvent(changeEvent);
+        } else if (description.includes("wheel")) {
+            problemCodeField.value = "ROBOTICS";
+            problemCodeField.dispatchEvent(changeEvent);
+            failureCodeField.value = "DUMECH";
+            failureCodeField.dispatchEvent(changeEvent);
+            causeCodeField.value = "JAM";
             causeCodeField.dispatchEvent(changeEvent);
         } else if (description.includes("drive") || description.includes("du") || description.includes("mismatch") || description.includes("bombed") || description.includes("bombe") || description.includes("bomben") || description.includes("firmware") || description.includes("bomb") || description.includes("bombs") || description.includes("wheel")) {
             problemCodeField.value = "ROBOTICS";
@@ -479,5 +486,6 @@
     setInterval(fillDatework, 60 * 60 * 1000);
 
 })();
+
 
 
