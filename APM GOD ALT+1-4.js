@@ -316,6 +316,13 @@
             failureCodeField.dispatchEvent(changeEvent);
             causeCodeField.value = "LOOSE";
             causeCodeField.dispatchEvent(changeEvent);
+        } else if (description.includes("filter")) {
+            problemCodeField.value = "ELEC";
+            problemCodeField.dispatchEvent(changeEvent);
+            failureCodeField.value = "FILTER";
+            failureCodeField.dispatchEvent(changeEvent);
+            causeCodeField.value = "DIRTY";
+            causeCodeField.dispatchEvent(changeEvent);
         } else if (description.includes("south") || description.includes("süden") || description.includes("jam") || description.includes("westen") || description.includes("outbound conveyor") || description.includes("Band") || description.includes("belt") || description.includes("west")) {
             problemCodeField.value = "JAM";
             problemCodeField.dispatchEvent(changeEvent);
@@ -486,6 +493,7 @@
     setInterval(fillDatework, 60 * 60 * 1000);
 
 })();
+
 
 
 
