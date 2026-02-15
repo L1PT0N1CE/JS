@@ -131,7 +131,7 @@
                 const cBtn = document.createElement('button');
                 cBtn.id = 'tm-copy-wo-btn';
                 cBtn.innerText = '📋 Copy';
-                cBtn.style = "margin-right:6px; padding:1px -50px; cursor:pointer; font-size:10px; background:#ff9900; border:1px solid #a88734; border-radius:3px; vertical-align:middle;";
+                cBtn.style = "margin-right:-50px; padding:1px 4px; cursor:pointer; font-size:10px; background:#ff9900; border:1px solid #a88734; border-radius:3px; vertical-align:middle;";
                 
                 cBtn.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
@@ -153,4 +153,5 @@
     observer.observe(document.body, { childList: true, subtree: true });
     injectUI();
 })();
+
 
