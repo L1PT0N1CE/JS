@@ -262,12 +262,18 @@
         if (/\boutbound\b|\bconvey(or|er)\b|\bhigh control\b/.test(title))
             return 'We removed the Jam. The Conveyor is operational again.\nBest regards.';
 
-        if (/\bpod\b|\bbin\b/.test(title))
+        if (/\bpod\b|\bbin\b|\bdirty\b|\bbinreinigung\b/.test(title))
             return 'We cleaned the POD. The POD is operational again.\nBest regards.';
 
-        if (/\bbildschirm\b|\bscreen\b|\brestart\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
+        if (/\bbildschirm\b|\bscreen\b|\baufgehängt\b|\bsystemerror\b|\bsystem error\b|\bsystemfehler\b|\brestart\b|\beingefroren\b|\bfrozen\b|\bneugestartet\b|\bstation is faulted\b|\bstation hängt\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
             return 'We restarted the System. The Station is operational again.\nBest regards.';
 
+        if (/\bcognex\b/.test(title))
+            return 'We fixed the Scanner. The Station is operational again.\nBest regards.';
+        
+        if (/\bcharger\b/.test(title))
+            return 'We fixed the Charger. The Charger is operational again.\nBest regards.';
+        
         if (/\bliquid\b|\bausgelaufen\b|\bspill\b/.test(title))
             return 'We cleaned the Area/Floor. The Area/Floor is operational again.\nBest regards.';
 
@@ -279,6 +285,9 @@
 
         if (/\blow confidence\b/.test(title))
             return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
+
+        if (/\bbeamer\b|\bmagenta\b|\bprojector\b/.test(title))
+            return 'We fixed the Projector. The Station is operational again.\nBest regards.';
 
         if (/\bdepal\b/.test(title))
             return 'We fixed the Jam/Crash on the Depal. The Depaletizer is operational again.\nBest regards.';
