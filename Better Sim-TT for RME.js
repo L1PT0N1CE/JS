@@ -265,7 +265,7 @@
         if (/\bpod\b|\bbin\b/.test(title))
             return 'We cleaned the POD. The POD is operational again.\nBest regards.';
 
-        if (/\bbildschirm\b|\bscreen\b|\brestart\b|\bneustart\b|\breboot\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
+        if (/\bbildschirm\b|\bscreen\b|\brestart\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
             return 'We restarted the System. The Station is operational again.\nBest regards.';
 
         if (/\bliquid\b|\bausgelaufen\b|\bspill\b/.test(title))
