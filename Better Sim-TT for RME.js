@@ -265,7 +265,7 @@
         if (/\bpod\b|\bbin\b|\bdirty\b|\bbinreinigung\b/.test(title))
             return 'We cleaned the POD. The POD is operational again.\nBest regards.';
 
-        if (/\bbildschirm\b|\bscreen\b|\baufgehängt\b|\bsystemerror\b|\bsystem error\b|\bsystemfehler\b|\brestart\b|\beingefroren\b|\bfrozen\b|\bneugestartet\b|\bstation is faulted\b|\bstation hängt\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
+        if (/\bbildschirm\b|\bscreen\b|\baufgehängt\b|\bsystemerror\b|\bsystem error\b|\bsystemfehler\b|\brestart\b|\bfaulted station\b|\beingefroren\b|\bfrozen\b|\bneugestartet\b|\bstation is faulted\b|\bstation hängt\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
             return 'We restarted the System. The Station is operational again.\nBest regards.';
 
         if (/\bcognex\b/.test(title))
