@@ -13755,7 +13755,8 @@
   const config = {
     ff_description: [
       "cel",
-      "Clean",
+      "drive",
+      "floor clean",
       "["
     ],
 
