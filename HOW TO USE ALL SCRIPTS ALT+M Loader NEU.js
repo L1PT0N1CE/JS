@@ -1,133 +1,84 @@
 // ==UserScript==
 // @name         HOW TO USE ALL SCRIPTS ALT+M Loader NEU
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Zeigt ein Fenster wie man scripte nutzt
+// @version      1.1
+// @description  Zeigt Anweisungen und Abo-Aufforderung
 // @author       Kanataza
-// @match        aHR0cHM6Ly9ldTEuZWFtLmh4Z25zbWFydGNsb3VkLmNvbS8=
+// @match        *://eu1.eam.hxgnsmartcloud.com/*
+// @match        *://us1.eam.hxgnsmartcloud.com/*
 // @grant        none
-// @icon         https://media.licdn.com/dms/image/D4E03AQGYEWJAKzMoHg/profile-displayphoto-shrink_800_800/0/1675186919356?e=2147483647&v=beta&t=yD2lwHTC78Y0eFQGGpl173y2Rhv9LmZgCe6LKvLYFvI
-
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    // Function to get the saved modal state
-    function getModalState() {
-        return localStorage.getItem('xyz-modal-closed') === 'true';
-    }
-
-    // Function to set the modal state
-    function setModalState(isClosed) {
-        localStorage.setItem('xyz-modal-closed', isClosed);
-    }
-
-    // Create the modal container
+    // Modal Initialisierung
     var modalContainer = document.createElement('div');
     modalContainer.id = 'xyz-modal-container';
-    modalContainer.style.position = 'fixed';
-    modalContainer.style.zIndex = '10000';
-    modalContainer.style.left = '50%';
-    modalContainer.style.top = '50%';
-    modalContainer.style.transform = 'translate(-50%, -50%)';
-    modalContainer.style.width = '400px';
-    modalContainer.style.padding = '20px';
-    modalContainer.style.backgroundColor = '#fff';
-    modalContainer.style.border = '2px solid #000';
-    modalContainer.style.boxShadow = '0px 0px 10px rgba(0, 0, 0, 0.5)';
-    modalContainer.style.cursor = 'move';
+    modalContainer.style.cssText = 'position:fixed; z-index:10000; left:50%; top:50%; transform:translate(-50%, -50%); width:400px; padding:20px; background-color:#fff; border:3px solid red; box-shadow:0px 0px 20px rgba(0,0,0,0.8); cursor:move; display:block;';
     document.body.appendChild(modalContainer);
 
-    // Create the close button
-    var closeButton = document.createElement('span');
-    closeButton.innerHTML = '&times;';
-    closeButton.style.position = 'absolute';
-    closeButton.style.top = '10px';
-    closeButton.style.right = '20px';
-    closeButton.style.cursor = 'pointer';
-    closeButton.style.fontSize = '20px';
-    closeButton.onclick = function() {
-        modalContainer.style.display = 'none';
-        setModalState(true); // Save the state as closed
-    };
-    modalContainer.appendChild(closeButton);
-
-    // Create the content of the modal
-    var modalContent = document.createElement('div');
-    modalContent.innerHTML = `
-        <h2>Azad's Script Instructions</h2>
-        <p>ALT+1 = Füllt LINKE Checkliste aus</p>
-        <p>ALT+2 = Füllt RECHTE Checkliste aus</p>
-        <p>ALT+X = Entfernt die komplette Checkliste</p>
-        <p>ALT+3 = Füllt Workorder aus. VORSICHT BEI PROBLEMCODES</p>
-        <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
-        <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte WO an dich</p>
-        <p>ALT+6 = 2x drücken schließt die mit rechtsklcik angewählte WO</p>
-        <p>ALT+C = Vorlage für FWO Comments. KOMMENTARFENSTER ÖFFNEN MIT DER MAUS WO ANDERS DRÜCKEN und DANACH ALT+C</p>
-        <h3>Zum öffnen und schließen ***ALT+M***</h3>
-    `;
-    modalContainer.appendChild(modalContent);
-
-    // Make the modal draggable
-    var isDragging = false;
-    var startX, startY, initialMouseX, initialMouseY;
-
-    modalContainer.onmousedown = function(e) {
-        isDragging = true;
-        startX = modalContainer.offsetLeft;
-        startY = modalContainer.offsetTop;
-        initialMouseX = e.clientX;
-        initialMouseY = e.clientY;
-        document.onmousemove = onMouseMove;
-        document.onmouseup = onMouseUp;
-        return false;
-    };
-
-    function onMouseMove(e) {
-        if (!isDragging) return;
-        var dx = e.clientX - initialMouseX;
-        var dy = e.clientY - initialMouseY;
-        modalContainer.style.left = startX + dx + 'px';
-        modalContainer.style.top = startY + dy + 'px';
-        return false;
-    }
-
-    function onMouseUp() {
-        isDragging = false;
-        document.onmousemove = null;
-        document.onmouseup = null;
-    }
-
-    // Function to toggle the modal visibility
-    function toggleModal() {
-        if (modalContainer.style.display === 'none') {
-            modalContainer.style.display = 'block';
-            setModalState(false); // Save the state as open
+    function updateContent(isLocked) {
+        if (isLocked) {
+            modalContainer.innerHTML = `
+                <div style="text-align:center; color:red;">
+                    <h2 style="margin-top:0;">⚠️ ABO ERFORDERLICH ⚠️</h2>
+                    <p>Um diese Scripts weiterhin zu nutzen, schließe bitte ein Abo bei <b>Azad Kanat</b> ab.</p>
+                    <hr>
+                    <p><b>Preise:</b></p>
+                    <ul style="list-style:none; padding:0;">
+                        <li>Standard: 20€ / Monat</li>
+                        <li>Für Cihanker: 30€ / Monat</li>
+                    </ul>
+                    <p style="font-size:0.8em;">Das Fenster lässt sich ohne aktives Abo nicht dauerhaft schließen.</p>
+                </div>
+            `;
         } else {
-            modalContainer.style.display = 'none';
-            setModalState(true); // Save the state as closed
+            // Originaler Inhalt (Anweisungen)
+            modalContainer.innerHTML = `
+                <span id="close-xyz" style="position:absolute; top:10px; right:20px; cursor:pointer; fontSize:20px;">&times;</span>
+                <h2>Azad's Script Instructions</h2>
+                <p>ALT+1 = Füllt LINKE Checkliste aus</p>
+                <p>ALT+2 = Füllt RECHTE Checkliste aus</p>
+                <p>ALT+X = Entfernt die komplette Checkliste</p>
+                <p>ALT+3 = Füllt Workorder aus. VORSICHT BEI PROBLEMCODES</p>
+                <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
+                <p>ALT+5 = 2x drücken assigned WO an dich</p>
+                <p>ALT+6 = 2x drücken schließt die WO</p>
+                <p>ALT+C = Vorlage für FWO Comments</p>
+                <h3>Zum öffnen und schließen ***ALT+M***</h3>
+            `;
+            document.getElementById('close-xyz').onclick = function() {
+                modalContainer.style.display = 'none';
+            };
         }
     }
 
-    // Check the saved modal state and set initial display
-    if (getModalState()) {
-        modalContainer.style.display = 'none';
-    } else {
-        modalContainer.style.display = 'block';
-    }
+    // Erster Aufruf
+    updateContent(true);
 
-    // Add keyboard shortcut to toggle the modal
+    // Draggable Funktion (gekürzt für Übersicht)
+    modalContainer.onmousedown = function(e) {
+        var startX = modalContainer.offsetLeft, startY = modalContainer.offsetTop;
+        var mouseX = e.clientX, mouseY = e.clientY;
+        document.onmousemove = function(e) {
+            modalContainer.style.left = (startX + e.clientX - mouseX) + 'px';
+            modalContainer.style.top = (startY + e.clientY - mouseY) + 'px';
+        };
+        document.onmouseup = function() { document.onmousemove = null; };
+    };
+
+    // Die 10-Sekunden-Schleife
+    setInterval(function() {
+        // Erzwingt das Anzeigen der Abo-Meldung alle 10 Sekunden
+        modalContainer.style.display = 'block';
+        updateContent(true);
+    }, 10000);
+
+    // Keyboard Shortcut
     document.addEventListener('keydown', function(e) {
         if (e.altKey && e.key.toLowerCase() === 'm') {
-            toggleModal();
+            modalContainer.style.display = (modalContainer.style.display === 'none' ? 'block' : 'none');
         }
     });
 })();
-
-
-
-
-
-
-
