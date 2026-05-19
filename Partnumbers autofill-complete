@@ -32,20 +32,20 @@
         "radio slowleft": { part: "82614", desc: "Drives" },
         "radio slowright": { part: "82617", desc: "Drives" },
         "tbs": { part: "N37718", desc: "TBS komplett" },
-        "thermoleiste": { part: "2068257", desc: "Slams" },
+        "thermoleiste": { part: "2068257", desc: "Slam" },
         "borfeld": { part: "80760", desc: "BORfeld komplett" },
-        "loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
+        "Loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
         "turntable liftermotor": { part: "2067201", desc: "Drives" },
         "casterwheel": { part: "N18702", desc: "Drives" },
         "poly 256": { part: "57562", desc: "Belts" },
         "poly 286": { part: "102592", desc: "Belts" },
         "powertwist": { part: "57470", desc: "Belts" },
-        "printer Left": { part: "55622", desc: "Slams" },
-        "printer Right": { part: "153213", desc: "Slams" },
-        "applicator right": { part: "80198", desc: "Slams" },
-        "applicator left": { part: "80199", desc: "Slams" },
-        "rewinder right": { part: "65714", desc: "Slams" },
-        "rewinder left": { part: "85394", desc: "Slams" }
+        "printer Left": { part: "55622", desc: "Slam" },
+        "printer Right": { part: "153213", desc: "Slam" },
+        "applicator right": { part: "80198", desc: "Slam" },
+        "applicator left": { part: "80199", desc: "Slam" },
+        "rewinder right": { part: "65714", desc: "Slam" },
+        "rewinder left": { part: "85394", desc: "Slam" }
     };
 
     function loadPartcodeMap() {
@@ -233,6 +233,7 @@
 
         entries.forEach(([key, data]) => {
             const row = document.createElement('div');
+            row.dataset.originalKey = key;
             row.style.cssText = `
                 display: flex;
                 align-items: center;
@@ -241,9 +242,10 @@
                 gap: 8px;
             `;
 
-            const keyInput = createInlineInput(key, '130px', 'Alias');
-            const partInput = createInlineInput(data.part, '110px', 'Partnumber');
-            const descInput = createInlineInput(data.desc, '160px', 'Beschreibung');
+            // ✅ Alias-Feld mit automatischer Kleinschreibung
+            const keyInput = createInlineInput(key, '130px', 'Alias', true);
+            const partInput = createInlineInput(data.part, '110px', 'Partnumber', false);
+            const descInput = createInlineInput(data.desc, '160px', 'Beschreibung', false);
             const saveBtn = createIconButton('💾', '#28a745', 'Speichern');
             const delBtn = createIconButton('🗑️', '#dc3545', 'Löschen');
 
@@ -279,7 +281,6 @@
             container.appendChild(row);
         });
 
-        // ✅ FIX: Nach dem Rendern ans Ende scrollen wenn gewünscht (neuer Eintrag)
         if (scrollToBottom) {
             requestAnimationFrame(() => {
                 container.scrollTop = container.scrollHeight;
@@ -287,14 +288,48 @@
         }
     }
 
+    // ✅ NEU: Save All – liest alle Zeilen auf einmal aus und speichert
+    function editorSaveAll(container) {
+        const rows = container.querySelectorAll('div[data-original-key]');
+        let errorFound = false;
+        const newMap = {};
+
+        rows.forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            const keyInput  = inputs[0];
+            const partInput = inputs[1];
+            const descInput = inputs[2];
+
+            const newKey  = keyInput.value.trim();
+            const newPart = partInput.value.trim();
+            const newDesc = descInput.value.trim();
+
+            if (!newKey || !newPart) {
+                keyInput.style.borderColor  = !newKey  ? '#dc3545' : '#ddd';
+                partInput.style.borderColor = !newPart ? '#dc3545' : '#ddd';
+                errorFound = true;
+                return;
+            }
+
+            // Doppelte Keys: letzter Eintrag gewinnt
+            newMap[newKey] = { part: newPart, desc: newDesc };
+        });
+
+        if (errorFound) {
+            showToast('⚠️ Alias & Partnumber dürfen nicht leer sein!');
+            return;
+        }
+
+        partcodeMap = newMap;
+        savePartcodeMap(partcodeMap);
+        editorRefreshList(container);
+        showToast('✅ Alle Einträge gespeichert!');
+    }
+
     function editorAddNewEntry() {
         if (!currentEditorList) return;
-
-        // Neuen Eintrag mit Prefix hinzufügen damit er alphabetisch ganz unten landet
-        const tempKey = '\u{FFFF}_new_' + Date.now();
+        const tempKey = '\uFFFF_new_' + Date.now();
         partcodeMap[tempKey] = { part: '', desc: '' };
-
-        // ✅ FIX: scrollToBottom = true übergeben
         editorRefreshList(currentEditorList, true);
 
         setTimeout(() => {
@@ -303,7 +338,6 @@
             if (lastKeyInput) {
                 lastKeyInput.focus();
                 lastKeyInput.select();
-                // ✅ FIX: Sicherstellen dass das neue Feld wirklich sichtbar ist
                 lastKeyInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }, 50);
@@ -367,15 +401,17 @@
             flex-wrap: wrap;
         `;
 
-        const addBtn = createToolbarButton('➕ New', '#28a745');
-        const importBtn = createToolbarButton('📥 Import', '#6c757d');
-        const exportBtn = createToolbarButton('📤 Export', '#6c757d');
-        const resetBtn = createToolbarButton('🔄 Reset', '#dc3545');
+        const addBtn     = createToolbarButton('➕ New',      '#28a745');
+        const saveAllBtn = createToolbarButton('💾 Save All', '#1976d2'); // ✅ NEU
+        const importBtn  = createToolbarButton('📥 Import',   '#6c757d');
+        const exportBtn  = createToolbarButton('📤 Export',   '#6c757d');
+        const resetBtn   = createToolbarButton('🔄 Reset',    '#dc3545');
 
-        addBtn.onclick = () => editorAddNewEntry();
-        importBtn.onclick = () => importJSON();
-        exportBtn.onclick = () => exportJSON();
-        resetBtn.onclick = () => {
+        addBtn.onclick     = () => editorAddNewEntry();
+        saveAllBtn.onclick = () => editorSaveAll(listContainer);  // ✅ NEU
+        importBtn.onclick  = () => importJSON();
+        exportBtn.onclick  = () => exportJSON();
+        resetBtn.onclick   = () => {
             if (confirm('Alle Änderungen verwerfen und Standard wiederherstellen?')) {
                 localStorage.removeItem(STORAGE_KEY);
                 partcodeMap = JSON.parse(JSON.stringify(defaultPartcodeMap));
@@ -384,6 +420,7 @@
         };
 
         toolbar.appendChild(addBtn);
+        toolbar.appendChild(saveAllBtn); // ✅ NEU
         toolbar.appendChild(importBtn);
         toolbar.appendChild(exportBtn);
         toolbar.appendChild(resetBtn);
@@ -425,7 +462,6 @@
             overlay.remove();
         };
 
-        // ✅ NEU: Footer hint mit Hyperlink neben "hond"
         const hint = document.createElement('span');
         hint.style.cssText = 'color: #666; font-size: 12px; display: flex; align-items: center; gap: 8px;';
         hint.innerHTML = `
@@ -442,7 +478,6 @@
                    border-radius: 3px;
                    background: #e3f2fd;
                    white-space: nowrap;
-                   transition: background 0.2s;
                "
                onmouseover="this.style.background='#bbdefb'"
                onmouseout="this.style.background='#e3f2fd'"
@@ -499,7 +534,8 @@
         return btn;
     }
 
-    function createInlineInput(value, width, placeholder) {
+    // ✅ forceLower Parameter hinzugefügt
+    function createInlineInput(value, width, placeholder, forceLower = false) {
         const input = document.createElement('input');
         input.value = value;
         input.placeholder = placeholder;
@@ -511,9 +547,20 @@
             font-size: 13px;
             font-family: monospace;
             flex-shrink: 0;
+            ${forceLower ? 'text-transform: lowercase;' : ''}
         `;
+
+        // ✅ Wert beim Tippen live in Kleinbuchstaben umwandeln
+        if (forceLower) {
+            input.addEventListener('input', () => {
+                const pos = input.selectionStart;
+                input.value = input.value.toLowerCase();
+                input.setSelectionRange(pos, pos);
+            });
+        }
+
         input.addEventListener('mousedown', (e) => e.stopPropagation(), true);
-        input.addEventListener('click', (e) => e.stopPropagation(), true);
+        input.addEventListener('click',     (e) => e.stopPropagation(), true);
         return input;
     }
 
@@ -693,5 +740,5 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    console.log('[Partcode Auto-Ersetzung v3.8] Geladen. Button: Direkt neben Titel | AutoOpen: AUS');
+    console.log('[Partcode Auto-Ersetzung v3.9] Geladen. Button: Direkt neben Titel | AutoOpen: AUS');
 })();
