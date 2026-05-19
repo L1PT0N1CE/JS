@@ -1,26 +1,10 @@
-// ==UserScript==
-// @name          APM GOD ALT1-4 DE&EN (Locked)
-// @namespace     https://phonetool.amazon.com/users/kanataza
-// @version       1.5
-// @description   All what you need honey - Locked until subscription
-// @author        kanataza
-// @match         *://eu1.eam.hxgnsmartcloud.com/*
-// @match         *://us1.eam.hxgnsmartcloud.com/*
-// @require       https://code.jquery.com/jquery-3.6.0.min.js
-// @require       https://code.jquery.com/ui/1.12.1/jquery-ui.min.js
-// @grant         GM_addStyle
-// ==/UserScript==
-
 (function() {
     'use strict';
-
-    const $ = jQuery.noConflict(true);
-
-    // Funktion zur Erstellung und Anzeige des Abo-Fensters
+    
+    // Das ist das eigentliche, gesperrte Skript
     function showLockModal() {
-        // Falls das Fenster bereits existiert, nur sichtbar machen und nach vorne holen
-        if ($("#xyz-lock-modal").length > 0) {
-            $("#xyz-lock-modal").show();
+        if (jQuery("#xyz-lock-modal").length > 0) {
+            jQuery("#xyz-lock-modal").show();
             return;
         }
 
@@ -41,21 +25,18 @@
             </div>
         `;
 
-        $("body").append(modalContent);
+        jQuery("body").append(modalContent);
+        jQuery("#xyz-lock-modal").draggable();
 
-        // Draggable machen über jQuery UI
-        $("#xyz-lock-modal").draggable();
-
-        // Schließen-Button Event (X) mit korrekter jQuery .css() Methode
-        $("#close-xyz-lock").hover(
-            function() { $(this).css('color', '#000'); },
-            function() { $(this).css('color', '#aaa'); }
+        jQuery("#close-xyz-lock").hover(
+            function() { jQuery(this).css('color', '#000'); },
+            function() { jQuery(this).css('color', '#aaa'); }
         ).click(function() {
-            $("#xyz-lock-modal").hide();
+            jQuery("#xyz-lock-modal").hide();
         });
     }
 
-    // Abgefangene Shortcuts -> Zeigen nur das Abo-Fenster
+    // Wenn der Loader dieses Skript aufruft, fangen wir die Shortcuts direkt ab
     document.addEventListener('keydown', function(event) {
         if (event.altKey) {
             const key = event.key.toLowerCase();
@@ -65,16 +46,15 @@
                 showLockModal();
             }
         }
-    }, true); // 'true' stellt sicher, dass das Event im Capturing-Modus abgefangen wird
+    }, true);
 
-    $(document).keydown(function(event) {
-        if (event.altKey && event.which === 52) { // ALT+4 Absicherung für jQuery Listener
+    jQuery(document).keydown(function(event) {
+        if (event.altKey && event.which === 52) { 
             event.preventDefault();
             event.stopPropagation();
             showLockModal();
         }
     });
 
-    console.log("APM GOD Script geladen, aber für Shortcuts gesperrt.");
-
+    console.log("APM GOD (Locked) direkt via GitHub aktiv.");
 })();
