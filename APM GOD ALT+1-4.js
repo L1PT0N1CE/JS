@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          APM GOD ALT1-4 DE&EN (Locked)
 // @namespace     https://phonetool.amazon.com/users/kanataza
-// @version       1.4
+// @version       1.5
 // @description   All what you need honey - Locked until subscription
 // @author        kanataza
 // @match         *://eu1.eam.hxgnsmartcloud.com/*
