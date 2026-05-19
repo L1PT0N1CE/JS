@@ -1,0 +1,697 @@
+(function() {
+    'use strict';
+
+    // ═══════════════════════════════════════════════════════
+    // PARTNUMMER-DATENBANK
+    // ═══════════════════════════════════════════════════════
+    const STORAGE_KEY = 'partcodeMap_v2';
+
+    const defaultPartcodeMap = {
+        "t11": { part: "482512", desc: "Podface" },
+        "t10": { part: "756583", desc: "Podface" },
+        "meaboard": { part: "2067189", desc: "Drives" },
+        "backplane": { part: "2068498", desc: "Drives" },
+        "fiducial": { part: "2111119", desc: "Floor Barcode" },
+        "hookarm": { part: "93176", desc: "Charger" },
+        "ui": { part: "N46141", desc: "Drives" },
+        "monitor": { part: "95656", desc: "Stations" },
+        "filter": { part: "41520", desc: "Blackbox - Stations" },
+        "filterplc": { part: "N42164", desc: "PLC - Stations" },
+        "ups": { part: "93176", desc: "Blackbox - Stations" },
+        "beamer": { part: "42145", desc: "Stations" },
+        "rack": { part: "97171", desc: "Rackbutton - Stations" },
+        "recharge": { part: "2067614", desc: "Socket - Charger" },
+        "charger": { part: "2068043", desc: "Delta - Charger" },
+        "chargesock": { part: "2068424", desc: "Socket - Drives" },
+        "toppad": { part: "285706", desc: "Drives" },
+        "ods": { part: "41532", desc: "Drives" },
+        "turntable": { part: "N23913", desc: "Drives" },
+        "turntable motor": { part: "2068504", desc: "Drives" },
+        "radio topleft": { part: "82616", desc: "Drives" },
+        "radio topright": { part: "82615", desc: "Drives" },
+        "radio slowleft": { part: "82614", desc: "Drives" },
+        "radio slowright": { part: "82617", desc: "Drives" },
+        "tbs": { part: "N37718", desc: "TBS komplett" },
+        "thermoleiste": { part: "2068257", desc: "Slam" },
+        "borfeld": { part: "80760", desc: "BORfeld komplett" },
+        "Loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
+        "turntable liftermotor": { part: "2067201", desc: "Drives" },
+        "casterwheel": { part: "N18702", desc: "Drives" },
+        "poly 256": { part: "57562", desc: "Belts" },
+        "poly 286": { part: "102592", desc: "Belts" },
+        "powertwist": { part: "57470", desc: "Belts" },
+        "printer Left": { part: "55622", desc: "Slam" },
+        "printer Right": { part: "153213", desc: "Slam" },
+        "applicator right": { part: "80198", desc: "Slam" },
+        "applicator left": { part: "80199", desc: "Slam" },
+        "rewinder right": { part: "65714", desc: "Slam" },
+        "rewinder left": { part: "85394", desc: "Slam" }
+    };
+
+    function loadPartcodeMap() {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) return JSON.parse(stored);
+        } catch (e) {
+            console.warn('[Partcode] Fehler beim Laden:', e);
+        }
+        return JSON.parse(JSON.stringify(defaultPartcodeMap));
+    }
+
+    function savePartcodeMap(map) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+            return true;
+        } catch (e) {
+            console.error('[Partcode] Fehler beim Speichern:', e);
+            return false;
+        }
+    }
+
+    let partcodeMap = loadPartcodeMap();
+
+    // ═══════════════════════════════════════════════════════
+    // AUTOCOMPLETE LOGIK
+    // ═══════════════════════════════════════════════════════
+    let activeDropdown = null;
+    let activeInput = null;
+    let isEditorOpen = false;
+
+    function createDropdown(input) {
+        removeDropdown();
+        const rect = input.getBoundingClientRect();
+        const dropdown = document.createElement('div');
+        dropdown.id = 'partcode-autocomplete';
+        dropdown.style.cssText = `
+            position: fixed;
+            top: ${rect.bottom + window.scrollY}px;
+            left: ${rect.left + window.scrollX}px;
+            width: ${rect.width}px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            z-index: 999999;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+        `;
+        activeDropdown = dropdown;
+        activeInput = input;
+        document.body.appendChild(dropdown);
+        return dropdown;
+    }
+
+    function removeDropdown() {
+        if (activeDropdown) {
+            activeDropdown.remove();
+            activeDropdown = null;
+            activeInput = null;
+        }
+    }
+
+    function populateDropdown(input, query) {
+        const dropdown = createDropdown(input);
+        const q = query.toLowerCase().trim();
+        const matches = Object.entries(partcodeMap).filter(([key, data]) => {
+            return key.includes(q) || data.desc.toLowerCase().includes(q) || data.part.toLowerCase().includes(q);
+        });
+
+        if (matches.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'padding: 10px; color: #999; font-style: italic;';
+            empty.textContent = 'Keine Treffer...';
+            dropdown.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(([key, data]) => {
+            const item = document.createElement('div');
+            item.className = 'partcode-item';
+            item.dataset.key = key;
+            item.dataset.part = data.part;
+            item.style.cssText = `
+                padding: 8px 12px;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                user-select: none;
+            `;
+            item.addEventListener('mouseenter', () => item.style.backgroundColor = '#e3f2fd');
+            item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
+            item.addEventListener('mousedown', (e) => {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                if (activeInput) selectPartcode(activeInput, item.dataset.key, item.dataset.part);
+            }, true);
+            item.innerHTML = `
+                <span>
+                    <strong style="color: #1976d2;">${key}</strong>
+                    <span style="color: #666; margin-left: 8px;">${data.desc}</span>
+                </span>
+                <span style="color: #888; font-size: 11px; font-family: monospace;">${data.part}</span>
+            `;
+            dropdown.appendChild(item);
+        });
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // EDITOR BUTTON
+    // ═══════════════════════════════════════════════════════
+    function injectEditorButton() {
+        const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el =>
+            el.textContent.trim() === 'Part Details & Planning'
+        );
+        if (!titleEl) return;
+        if (titleEl.querySelector('#partcode-editor-btn')) return;
+
+        const wrapper = document.createElement('span');
+        wrapper.style.cssText = `
+            display: inline-flex !important;
+            align-items: center;
+            white-space: nowrap;
+        `;
+
+        const originalText = titleEl.textContent;
+        titleEl.textContent = '';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = originalText;
+        textSpan.style.cssText = 'display: inline;';
+        wrapper.appendChild(textSpan);
+
+        const btn = document.createElement('span');
+        btn.id = 'partcode-editor-btn';
+        btn.title = 'Partcodes verwalten (' + Object.keys(partcodeMap).length + ' Einträge)';
+        btn.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #1976d2;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            margin-left: 6px;
+            flex-shrink: 0;
+            user-select: none;
+            transition: background 0.2s;
+        `;
+        btn.innerHTML = '⚙️';
+        btn.addEventListener('mouseenter', () => btn.style.background = '#1565c0');
+        btn.addEventListener('mouseleave', () => btn.style.background = '#1976d2');
+        btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            removeDropdown();
+            openEditor();
+        });
+
+        wrapper.appendChild(btn);
+        titleEl.appendChild(wrapper);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // EDITOR HILFSFUNKTIONEN
+    // ═══════════════════════════════════════════════════════
+    let currentEditorList = null;
+
+    function editorRefreshList(container, scrollToBottom = false) {
+        container.innerHTML = '';
+        const entries = Object.entries(partcodeMap).sort((a, b) => a[0].localeCompare(b[0]));
+
+        if (entries.length === 0) {
+            container.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Keine Einträge vorhanden</div>';
+            return;
+        }
+
+        entries.forEach(([key, data]) => {
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display: flex;
+                align-items: center;
+                padding: 10px 20px;
+                border-bottom: 1px solid #f0f0f0;
+                gap: 8px;
+            `;
+
+            const keyInput = createInlineInput(key, '130px', 'Alias');
+            const partInput = createInlineInput(data.part, '110px', 'Partnumber');
+            const descInput = createInlineInput(data.desc, '160px', 'Beschreibung');
+            const saveBtn = createIconButton('💾', '#28a745', 'Speichern');
+            const delBtn = createIconButton('🗑️', '#dc3545', 'Löschen');
+
+            saveBtn.onclick = () => {
+                const newKey = keyInput.value.trim();
+                const newPart = partInput.value.trim();
+                const newDesc = descInput.value.trim();
+                if (!newKey || !newPart) {
+                    alert('Alias und Partnumber sind Pflicht!');
+                    return;
+                }
+                if (newKey !== key) delete partcodeMap[key];
+                partcodeMap[newKey] = { part: newPart, desc: newDesc };
+                savePartcodeMap(partcodeMap);
+                editorRefreshList(container);
+                showToast('✅ Gespeichert!');
+            };
+
+            delBtn.onclick = () => {
+                if (confirm(`"${key}" wirklich löschen?`)) {
+                    delete partcodeMap[key];
+                    savePartcodeMap(partcodeMap);
+                    editorRefreshList(container);
+                    showToast('🗑️ Gelöscht!');
+                }
+            };
+
+            row.appendChild(keyInput);
+            row.appendChild(partInput);
+            row.appendChild(descInput);
+            row.appendChild(saveBtn);
+            row.appendChild(delBtn);
+            container.appendChild(row);
+        });
+
+        // ✅ FIX: Nach dem Rendern ans Ende scrollen wenn gewünscht (neuer Eintrag)
+        if (scrollToBottom) {
+            requestAnimationFrame(() => {
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+    }
+
+    function editorAddNewEntry() {
+        if (!currentEditorList) return;
+
+        // Neuen Eintrag mit Prefix hinzufügen damit er alphabetisch ganz unten landet
+        const tempKey = '\u{FFFF}_new_' + Date.now();
+        partcodeMap[tempKey] = { part: '', desc: '' };
+
+        // ✅ FIX: scrollToBottom = true übergeben
+        editorRefreshList(currentEditorList, true);
+
+        setTimeout(() => {
+            const inputs = currentEditorList.querySelectorAll('input');
+            const lastKeyInput = inputs[inputs.length - 3];
+            if (lastKeyInput) {
+                lastKeyInput.focus();
+                lastKeyInput.select();
+                // ✅ FIX: Sicherstellen dass das neue Feld wirklich sichtbar ist
+                lastKeyInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }, 50);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // INLINE EDITOR
+    // ═══════════════════════════════════════════════════════
+    function openEditor() {
+        if (isEditorOpen) return;
+        isEditorOpen = true;
+
+        const existing = document.getElementById('partcode-editor-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'partcode-editor-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        `;
+
+        const panel = document.createElement('div');
+        panel.style.cssText = `
+            background: #fff;
+            border-radius: 8px;
+            width: 650px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        `;
+
+        const header = document.createElement('div');
+        header.style.cssText = `
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        header.innerHTML = `
+            <h2 style="margin: 0; font-size: 18px; color: #333;">🔧 Partnumber Editor</h2>
+            <span style="color: #666; font-size: 12px;">${Object.keys(partcodeMap).length} Einträge</span>
+        `;
+
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = `
+            padding: 12px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        `;
+
+        const addBtn = createToolbarButton('➕ New', '#28a745');
+        const importBtn = createToolbarButton('📥 Import', '#6c757d');
+        const exportBtn = createToolbarButton('📤 Export', '#6c757d');
+        const resetBtn = createToolbarButton('🔄 Reset', '#dc3545');
+
+        addBtn.onclick = () => editorAddNewEntry();
+        importBtn.onclick = () => importJSON();
+        exportBtn.onclick = () => exportJSON();
+        resetBtn.onclick = () => {
+            if (confirm('Alle Änderungen verwerfen und Standard wiederherstellen?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                partcodeMap = JSON.parse(JSON.stringify(defaultPartcodeMap));
+                if (currentEditorList) editorRefreshList(currentEditorList);
+            }
+        };
+
+        toolbar.appendChild(addBtn);
+        toolbar.appendChild(importBtn);
+        toolbar.appendChild(exportBtn);
+        toolbar.appendChild(resetBtn);
+
+        const listContainer = document.createElement('div');
+        listContainer.style.cssText = `
+            overflow-y: auto;
+            flex: 1;
+            padding: 0;
+        `;
+
+        currentEditorList = listContainer;
+
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            padding: 12px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        `;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Schließen';
+        closeBtn.style.cssText = `
+            padding: 8px 20px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        closeBtn.onclick = () => {
+            isEditorOpen = false;
+            currentEditorList = null;
+            overlay.remove();
+        };
+
+        // ✅ NEU: Footer hint mit Hyperlink neben "hond"
+        const hint = document.createElement('span');
+        hint.style.cssText = 'color: #666; font-size: 12px; display: flex; align-items: center; gap: 8px;';
+        hint.innerHTML = `
+            VERGISS NICHT ZU SPEICHERN DU HOND
+            <a href="https://amazondeu-my.sharepoint.com/:x:/r/personal/kanataza_amazon_de/Documents/Spareparts%20by%20Azad%20Kanat%20%26%20Co.xlsx?d=w6898e9f8051f4f8fb18dda1fa38c271b&csf=1&web=1&e=bWpnWq"
+               target="_blank"
+               style="
+                   color: #1976d2;
+                   text-decoration: none;
+                   font-size: 12px;
+                   font-weight: 600;
+                   padding: 2px 7px;
+                   border: 1px solid #1976d2;
+                   border-radius: 3px;
+                   background: #e3f2fd;
+                   white-space: nowrap;
+                   transition: background 0.2s;
+               "
+               onmouseover="this.style.background='#bbdefb'"
+               onmouseout="this.style.background='#e3f2fd'"
+            >📋 Azad's Sparepartliste</a>
+        `;
+
+        footer.appendChild(hint);
+        footer.appendChild(closeBtn);
+
+        panel.appendChild(header);
+        panel.appendChild(toolbar);
+        panel.appendChild(listContainer);
+        panel.appendChild(footer);
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        editorRefreshList(listContainer);
+    }
+
+    function createToolbarButton(text, color) {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.style.cssText = `
+            padding: 6px 12px;
+            background: ${color};
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        `;
+        return btn;
+    }
+
+    function createIconButton(icon, color, title) {
+        const btn = document.createElement('button');
+        btn.textContent = icon;
+        btn.title = title;
+        btn.style.cssText = `
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: ${color};
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        `;
+        return btn;
+    }
+
+    function createInlineInput(value, width, placeholder) {
+        const input = document.createElement('input');
+        input.value = value;
+        input.placeholder = placeholder;
+        input.style.cssText = `
+            width: ${width};
+            padding: 6px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: monospace;
+            flex-shrink: 0;
+        `;
+        input.addEventListener('mousedown', (e) => e.stopPropagation(), true);
+        input.addEventListener('click', (e) => e.stopPropagation(), true);
+        return input;
+    }
+
+    function exportJSON() {
+        const dataStr = JSON.stringify(partcodeMap, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'partcodes_export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('📤 Exportiert!');
+    }
+
+    function importJSON() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    for (const [key, val] of Object.entries(imported)) {
+                        if (typeof val !== 'object' || !val.part) {
+                            throw new Error(`Ungültiges Format bei "${key}"`);
+                        }
+                    }
+                    if (confirm(`${Object.keys(imported).length} Einträge importieren?`)) {
+                        Object.assign(partcodeMap, imported);
+                        savePartcodeMap(partcodeMap);
+                        if (currentEditorList) editorRefreshList(currentEditorList);
+                        showToast('📥 Import erfolgreich!');
+                    }
+                } catch (err) {
+                    alert('Fehler beim Import: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }
+
+    function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 1000001;
+            animation: slideUp 0.3s ease;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.transition = 'opacity 0.3s';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }
+
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+            to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // ═══════════════════════════════════════════════════════
+    // BESTEHENDE FUNKTIONEN
+    // ═══════════════════════════════════════════════════════
+    function getExtComponent(name) {
+        if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return null;
+        const cmps = Ext.ComponentQuery.query('[name="' + name + '"]');
+        return cmps && cmps.length > 0 ? cmps[0] : null;
+    }
+
+    function setExtFieldValue(name, value) {
+        const cmp = getExtComponent(name);
+        if (!cmp) {
+            const input = document.querySelector('input[name="' + name + '"]');
+            if (input) {
+                input.value = value;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            return false;
+        }
+        if (cmp.setValue) cmp.setValue(value);
+        if (cmp.fireEvent) cmp.fireEvent('change', cmp, value);
+        const inputEl = document.querySelector('input[name="' + name + '"]');
+        if (inputEl) {
+            inputEl.style.backgroundColor = '#d4edda';
+            inputEl.style.transition = 'background-color 0.3s';
+            setTimeout(() => inputEl.style.backgroundColor = '', 600);
+        }
+        return true;
+    }
+
+    function autoFillQuantity() {
+        setExtFieldValue('transactionquantity', '1');
+    }
+
+    function selectPartcode(input, key, partNumber) {
+        input.value = partNumber;
+        input.dispatchEvent(new Event('change', { bubbles: true, cancelable: false }));
+        try {
+            const cmpId = input.getAttribute('data-componentid');
+            if (cmpId && typeof Ext !== 'undefined' && Ext.getCmp) {
+                const cmp = Ext.getCmp(cmpId);
+                if (cmp && cmp.setValue) cmp.setValue(partNumber);
+            }
+        } catch (e) {}
+        input.style.backgroundColor = '#d4edda';
+        input.style.transition = 'background-color 0.3s';
+        setTimeout(() => input.style.backgroundColor = '', 600);
+        removeDropdown();
+        setTimeout(() => autoFillQuantity(), 500);
+        console.log(`[Partcode] "${key}" → "${partNumber}" (Quantity: 1)`);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // EVENT LISTENER
+    // ═══════════════════════════════════════════════════════
+    document.addEventListener('input', (e) => {
+        const input = e.target;
+        if (input.name !== 'partcode') return;
+        if (isEditorOpen) return;
+        const val = input.value;
+        if (val.length >= 1) {
+            populateDropdown(input, val);
+        } else {
+            removeDropdown();
+        }
+    }, true);
+
+    document.addEventListener('click', (e) => {
+        if (isEditorOpen) return;
+        if (activeDropdown && !activeDropdown.contains(e.target) && e.target !== activeInput) {
+            removeDropdown();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Tab') {
+            removeDropdown();
+        }
+    }, true);
+
+    // ═══════════════════════════════════════════════════════
+    // INITIALISIERUNG
+    // ═══════════════════════════════════════════════════════
+    function init() {
+        injectEditorButton();
+        setTimeout(injectEditorButton, 1000);
+        setTimeout(injectEditorButton, 3000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    const observer = new MutationObserver(() => {
+        injectEditorButton();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    console.log('[Partcode Auto-Ersetzung v3.8] Geladen. Button: Direkt neben Titel | AutoOpen: AUS');
+})();
