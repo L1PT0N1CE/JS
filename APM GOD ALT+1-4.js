@@ -17,8 +17,8 @@
                     <hr style="border:1px solid red;">
                     <p style="color:black;"><b>Preise:</b></p>
                     <ul style="list-style:none; padding:0; color:black; font-weight:bold;">
-                        <li>Standard: 20€ / Monat</li>
-                        <li>Für Cihanker: 30€ / Monat</li>
+                        <li>Standard: 15€ / Monat</li>
+                        <li>Für Cihanker: 20€ / Monat</li>
                     </ul>
                     <p style="font-size:0.8em; color:gray;">Das Skript bleibt bis zur Freischaltung deaktiviert.</p>
                 </div>
