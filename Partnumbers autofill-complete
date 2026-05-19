@@ -32,20 +32,20 @@
         "radio slowleft": { part: "82614", desc: "Drives" },
         "radio slowright": { part: "82617", desc: "Drives" },
         "tbs": { part: "N37718", desc: "TBS komplett" },
-        "thermoleiste": { part: "2068257", desc: "Slam" },
+        "thermoleiste": { part: "2068257", desc: "Slams" },
         "borfeld": { part: "80760", desc: "BORfeld komplett" },
-        "Loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
+        "loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
         "turntable liftermotor": { part: "2067201", desc: "Drives" },
         "casterwheel": { part: "N18702", desc: "Drives" },
         "poly 256": { part: "57562", desc: "Belts" },
         "poly 286": { part: "102592", desc: "Belts" },
         "powertwist": { part: "57470", desc: "Belts" },
-        "printer Left": { part: "55622", desc: "Slam" },
-        "printer Right": { part: "153213", desc: "Slam" },
-        "applicator right": { part: "80198", desc: "Slam" },
-        "applicator left": { part: "80199", desc: "Slam" },
-        "rewinder right": { part: "65714", desc: "Slam" },
-        "rewinder left": { part: "85394", desc: "Slam" }
+        "printer Left": { part: "55622", desc: "Slams" },
+        "printer Right": { part: "153213", desc: "Slams" },
+        "applicator right": { part: "80198", desc: "Slams" },
+        "applicator left": { part: "80199", desc: "Slams" },
+        "rewinder right": { part: "65714", desc: "Slams" },
+        "rewinder left": { part: "85394", desc: "Slams" }
     };
 
     function loadPartcodeMap() {
