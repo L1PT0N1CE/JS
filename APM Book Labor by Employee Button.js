@@ -1,6 +1,80 @@
 (function () {
     "use strict";
 
+    const LS_KEY = 'apmUsername';
+
+    /* ================= USERNAME HANDLING ================= */
+    function getUsername() {
+        return localStorage.getItem(LS_KEY) || null;
+    }
+
+    function askForUsername(onSuccess) {
+        // Versuche zuerst automatisch aus dem EAM-Login zu lesen
+        const autoDetect = localStorage.getItem('login') || localStorage.getItem('loginKANATAZA') ? null : null;
+
+        const overlay = createOverlay();
+        overlay.style.zIndex = "999999";
+
+        const box = document.createElement("div");
+        box.style = "position:relative; background:white; padding:24px 24px 20px; border-radius:8px; min-width:300px; text-align:center; box-shadow:0 0 16px rgba(0,0,0,0.4);";
+
+        const title = document.createElement("h3");
+        title.innerText = "APM Script - Login";
+        title.style = "margin:0 0 6px 0; font-size:15px;";
+
+        const sub = document.createElement("p");
+        sub.innerText = "Bitte deinen EAM-Benutzernamen eingeben:";
+        sub.style = "margin:0 0 14px 0; font-size:12px; color:#555;";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "z.B. KANATAZA";
+        input.style = "width:200px; padding:7px 10px; font-size:14px; border:1px solid #ccc; border-radius:4px; text-transform:uppercase;";
+
+        // Versuche bekannten Wert aus anderen LS-Keys zu prefüllen
+        const knownLogins = ['login', 'lastSelectedEmployee', 'filtervalueLogin'];
+        for (const key of knownLogins) {
+            const val = localStorage.getItem(key);
+            if (val && val.length > 2 && val.length < 20) {
+                input.value = val.toUpperCase();
+                break;
+            }
+        }
+
+        input.addEventListener("input", () => {
+            input.value = input.value.toUpperCase();
+        });
+
+        const okBtn = document.createElement("button");
+        okBtn.innerText = "Speichern & Weiter";
+        okBtn.style = "margin-top:14px; padding:7px 16px; cursor:pointer; background:#ff9900; border:1px solid #a88734; border-radius:4px; font-weight:bold;";
+        okBtn.onclick = () => {
+            const val = input.value.trim();
+            if (!val) { input.style.border = "1px solid red"; return; }
+            localStorage.setItem(LS_KEY, val);
+            document.body.removeChild(overlay);
+            if (onSuccess) onSuccess(val);
+        };
+
+        input.addEventListener("keydown", e => {
+            if (e.key === "Enter") okBtn.click();
+        });
+
+        box.append(title, sub, input, document.createElement("br"), okBtn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        setTimeout(() => input.focus(), 100);
+    }
+
+    function ensureUsername(callback) {
+        const existing = getUsername();
+        if (existing) {
+            callback(existing);
+        } else {
+            askForUsername(callback);
+        }
+    }
+
     /* ================= HILFSFUNKTIONEN ================= */
     function setField(el, val) {
         if (!el) return;
@@ -56,90 +130,105 @@
 
     /* ================= EDIT MODAL ================= */
     function openEditModal(type, defaultText) {
-        const username = localStorage.getItem('apmUsername');
-        if (!username) {
-            alert('Kein Login in localStorage gefunden! Bitte zuerst das Login-Script ausführen.');
-            return;
-        }
+        ensureUsername(username => {
+            const overlay = createOverlay();
 
-        const overlay = createOverlay();
+            const box = document.createElement("div");
+            box.style = "position:relative; background:white; padding:20px; border-radius:8px; min-width:280px; text-align:center; box-shadow:0 0 12px rgba(0,0,0,0.35);";
 
-        const box = document.createElement("div");
-        box.style = "position:relative; background:white; padding:20px; border-radius:8px; min-width:280px; text-align:center; box-shadow:0 0 12px rgba(0,0,0,0.35);";
+            const closeOverlay = () => document.body.removeChild(overlay);
+            box.appendChild(createCloseButton(closeOverlay));
 
-        const closeOverlay = () => document.body.removeChild(overlay);
+            const title = document.createElement("h3");
+            title.innerText = `Buchung: ${type} (${username})`;
+            title.style.marginBottom = "15px";
 
-        box.appendChild(createCloseButton(closeOverlay));
+            const inputTime = document.createElement("input");
+            inputTime.type = "text";
+            inputTime.value = "0,5";
+            inputTime.style = "width:120px; padding:6px; margin:5px;";
 
-        const title = document.createElement("h3");
-        title.innerText = `Buchung: ${type} (${username})`;
-        title.style.marginBottom = "15px";
+            const inputText = document.createElement("input");
+            inputText.type = "text";
+            inputText.value = defaultText;
+            inputText.style = "width:200px; padding:6px; margin:5px;";
 
-        const inputTime = document.createElement("input");
-        inputTime.type = "text";
-        inputTime.value = "0,5";
-        inputTime.style = "width:120px; padding:6px; margin:5px;";
+            const okBtn = document.createElement("button");
+            okBtn.innerText = "OK";
+            okBtn.style = "padding:6px 12px; margin-top:12px; cursor:pointer;";
+            okBtn.onclick = () => {
+                closeOverlay();
+                fillFields(type, inputTime.value, inputText.value);
+            };
 
-        const inputText = document.createElement("input");
-        inputText.type = "text";
-        inputText.value = defaultText;
-        inputText.style = "width:200px; padding:6px; margin:5px;";
+            box.append(
+                title,
+                "Zeit (Komma):", document.createElement("br"),
+                inputTime, document.createElement("br"),
+                "Beschreibung:", document.createElement("br"),
+                inputText, document.createElement("br"),
+                okBtn
+            );
 
-        const okBtn = document.createElement("button");
-        okBtn.innerText = "OK";
-        okBtn.style = "padding:6px 12px; margin-top:12px; cursor:pointer;";
-        okBtn.onclick = () => {
-            closeOverlay();
-            fillFields(type, inputTime.value, inputText.value);
-        };
-
-        box.append(
-            title,
-            "Zeit (Komma):", document.createElement("br"),
-            inputTime, document.createElement("br"),
-            "Beschreibung:", document.createElement("br"),
-            inputText, document.createElement("br"),
-            okBtn
-        );
-
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        });
     }
 
     /* ================= MAIN MODAL ================= */
     function openMainModal() {
-        const overlay = createOverlay();
-        overlay.style.zIndex = "99999";
+        ensureUsername(() => {
+            const overlay = createOverlay();
+            overlay.style.zIndex = "99999";
 
-        const box = document.createElement("div");
-        box.style = "position:relative; background:white; padding:20px 20px 16px; border-radius:8px; text-align:center; min-width:250px; box-shadow:0 0 12px rgba(0,0,0,0.35);";
+            const box = document.createElement("div");
+            box.style = "position:relative; background:white; padding:20px 20px 16px; border-radius:8px; text-align:center; min-width:250px; box-shadow:0 0 12px rgba(0,0,0,0.35);";
 
-        const closeOverlay = () => document.body.removeChild(overlay);
+            const closeOverlay = () => document.body.removeChild(overlay);
+            box.appendChild(createCloseButton(closeOverlay));
 
-        box.appendChild(createCloseButton(closeOverlay));
+            const title = document.createElement("p");
+            title.innerText = "Buchungstyp wählen:";
+            title.style = "margin: 8px 0 12px; font-weight:bold;";
 
-        const title = document.createElement("p");
-        title.innerText = "Buchungstyp wählen:";
-        title.style = "margin: 8px 0 12px; font-weight:bold;";
+            // Username anzeigen + Reset-Link
+            const userInfo = document.createElement("p");
+            const currentUser = getUsername();
+            userInfo.style = "font-size:11px; color:#888; margin:0 0 10px 0;";
+            userInfo.innerHTML = `Eingeloggt als: <strong>${currentUser}</strong> `;
 
-        const createBtn = (label, type, text) => {
-            const b = document.createElement("button");
-            b.innerText = label;
-            b.style = "margin:5px; padding:6px 12px; cursor:pointer;";
-            b.onclick = () => { closeOverlay(); openEditModal(type, text); };
-            return b;
-        };
+            const changeLink = document.createElement("a");
+            changeLink.href = "#";
+            changeLink.innerText = "ändern";
+            changeLink.style = "font-size:11px; color:#ff9900;";
+            changeLink.onclick = (e) => {
+                e.preventDefault();
+                closeOverlay();
+                localStorage.removeItem(LS_KEY);
+                askForUsername(() => openMainModal());
+            };
+            userInfo.appendChild(changeLink);
 
-        box.append(
-            title,
-            createBtn("Start-MET", "MET", "Startmeeting"),
-            createBtn("RSP-MET", "MET", "RSP & RME MEETING"),
-            createBtn("ADM", "ADM", "MAILS"),
-            createBtn("T", "T", "Learn ATOZ")
-        );
+            const createBtn = (label, type, text) => {
+                const b = document.createElement("button");
+                b.innerText = label;
+                b.style = "margin:5px; padding:6px 12px; cursor:pointer;";
+                b.onclick = () => { closeOverlay(); openEditModal(type, text); };
+                return b;
+            };
 
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
+            box.append(
+                title,
+                userInfo,
+                createBtn("Start-MET", "MET", "Startmeeting"),
+                createBtn("RSP-MET", "MET", "RSP & RME MEETING"),
+                createBtn("ADM", "ADM", "MAILS"),
+                createBtn("T", "T", "Learn ATOZ")
+            );
+
+            overlay.appendChild(box);
+            document.body.appendChild(overlay);
+        });
     }
 
     /* ================= UI BUTTON INJEKTION ================= */
