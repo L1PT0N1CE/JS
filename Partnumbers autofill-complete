@@ -4,49 +4,49 @@
     // ═══════════════════════════════════════════════════════
     // PARTNUMMER-DATENBANK
     // ═══════════════════════════════════════════════════════
-    const STORAGE_KEY = 'partcodeMap_v2';
+    const STORAGE_KEY = 'partcodeMap_v3';
 
-    const defaultPartcodeMap = {
-        "t11": { part: "482512", desc: "Podface" },
-        "t10": { part: "756583", desc: "Podface" },
-        "meaboard": { part: "2067189", desc: "Drives" },
-        "backplane": { part: "2068498", desc: "Drives" },
-        "fiducial": { part: "2111119", desc: "Floor Barcode" },
-        "hookarm": { part: "93176", desc: "Charger" },
-        "ui": { part: "N46141", desc: "Drives" },
-        "monitor": { part: "95656", desc: "Stations" },
-        "filter": { part: "41520", desc: "Blackbox - Stations" },
-        "filterplc": { part: "N42164", desc: "PLC - Stations" },
-        "ups": { part: "93176", desc: "Blackbox - Stations" },
-        "beamer": { part: "42145", desc: "Stations" },
-        "rack": { part: "97171", desc: "Rackbutton - Stations" },
-        "recharge": { part: "2067614", desc: "Socket - Charger" },
-        "charger": { part: "2068043", desc: "Delta - Charger" },
-        "chargesock": { part: "2068424", desc: "Socket - Drives" },
-        "toppad": { part: "285706", desc: "Drives" },
-        "ods": { part: "41532", desc: "Drives" },
-        "turntable": { part: "N23913", desc: "Drives" },
-        "turntable motor": { part: "2068504", desc: "Drives" },
-        "radio topleft": { part: "82616", desc: "Drives" },
-        "radio topright": { part: "82615", desc: "Drives" },
-        "radio slowleft": { part: "82614", desc: "Drives" },
-        "radio slowright": { part: "82617", desc: "Drives" },
-        "tbs": { part: "N37718", desc: "TBS komplett" },
-        "thermoleiste": { part: "2068257", desc: "Slam" },
-        "borfeld": { part: "80760", desc: "BORfeld komplett" },
-        "Loco Wheel": { part: "3000011", desc: "ASI WHEEL - Drives" },
-        "turntable liftermotor": { part: "2067201", desc: "Drives" },
-        "casterwheel": { part: "N18702", desc: "Drives" },
-        "poly 256": { part: "57562", desc: "Belts" },
-        "poly 286": { part: "102592", desc: "Belts" },
-        "powertwist": { part: "57470", desc: "Belts" },
-        "printer Left": { part: "55622", desc: "Slam" },
-        "printer Right": { part: "153213", desc: "Slam" },
-        "applicator right": { part: "80198", desc: "Slam" },
-        "applicator left": { part: "80199", desc: "Slam" },
-        "rewinder right": { part: "65714", desc: "Slam" },
-        "rewinder left": { part: "85394", desc: "Slam" }
-    };
+    const defaultPartcodeMap = [
+        { key: "t11",                 part: "482512",  desc: "Podface" },
+        { key: "t10",                 part: "756583",  desc: "Podface" },
+        { key: "meaboard",            part: "2067189", desc: "Drives" },
+        { key: "backplane",           part: "2068498", desc: "Drives" },
+        { key: "fiducial",            part: "2111119", desc: "Floor Barcode" },
+        { key: "hookarm",             part: "93176",   desc: "Charger" },
+        { key: "ui",                  part: "N46141",  desc: "Drives" },
+        { key: "monitor",             part: "95656",   desc: "Stations" },
+        { key: "filter",              part: "41520",   desc: "Blackbox - Stations" },
+        { key: "filterplc",           part: "N42164",  desc: "PLC - Stations" },
+        { key: "ups",                 part: "93176",   desc: "Blackbox - Stations" },
+        { key: "beamer",              part: "42145",   desc: "Stations" },
+        { key: "rack",                part: "97171",   desc: "Rackbutton - Stations" },
+        { key: "recharge",            part: "2067614", desc: "Socket - Charger" },
+        { key: "charger",             part: "2068043", desc: "Delta - Charger" },
+        { key: "chargesock",          part: "2068424", desc: "Socket - Drives" },
+        { key: "toppad",              part: "285706",  desc: "Drives" },
+        { key: "ods",                 part: "41532",   desc: "Drives" },
+        { key: "turntable",           part: "N23913",  desc: "Drives" },
+        { key: "turntable motor",     part: "2068504", desc: "Drives" },
+        { key: "radio topleft",       part: "82616",   desc: "Drives" },
+        { key: "radio topright",      part: "82615",   desc: "Drives" },
+        { key: "radio slowleft",      part: "82614",   desc: "Drives" },
+        { key: "radio slowright",     part: "82617",   desc: "Drives" },
+        { key: "tbs",                 part: "N37718",  desc: "TBS komplett" },
+        { key: "thermoleiste",        part: "2068257", desc: "Slam" },
+        { key: "borfeld",             part: "80760",   desc: "BORfeld komplett" },
+        { key: "Loco Wheel",          part: "3000011", desc: "ASI WHEEL - Drives" },
+        { key: "turntable liftermotor", part: "2067201", desc: "Drives" },
+        { key: "casterwheel",         part: "N18702",  desc: "Drives" },
+        { key: "poly 256",            part: "57562",   desc: "Belts" },
+        { key: "poly 286",            part: "102592",  desc: "Belts" },
+        { key: "powertwist",          part: "57470",   desc: "Belts" },
+        { key: "printer Left",        part: "55622",   desc: "Slam" },
+        { key: "printer Right",       part: "153213",  desc: "Slam" },
+        { key: "applicator right",    part: "80198",   desc: "Slam" },
+        { key: "applicator left",     part: "80199",   desc: "Slam" },
+        { key: "rewinder right",      part: "65714",   desc: "Slam" },
+        { key: "rewinder left",       part: "85394",   desc: "Slam" }
+    ];
 
     function loadPartcodeMap() {
         try {
@@ -115,8 +115,11 @@
     function populateDropdown(input, query) {
         const dropdown = createDropdown(input);
         const q = query.toLowerCase().trim();
-        const matches = Object.entries(partcodeMap).filter(([key, data]) => {
-            return key.includes(q) || data.desc.toLowerCase().includes(q) || data.part.toLowerCase().includes(q);
+
+        const matches = partcodeMap.filter(entry => {
+            return entry.key.toLowerCase().includes(q)
+                || entry.desc.toLowerCase().includes(q)
+                || entry.part.toLowerCase().includes(q);
         });
 
         if (matches.length === 0) {
@@ -127,11 +130,11 @@
             return;
         }
 
-        matches.forEach(([key, data]) => {
+        matches.forEach((entry) => {
             const item = document.createElement('div');
             item.className = 'partcode-item';
-            item.dataset.key = key;
-            item.dataset.part = data.part;
+            item.dataset.key  = entry.key;
+            item.dataset.part = entry.part;
             item.style.cssText = `
                 padding: 8px 12px;
                 cursor: pointer;
@@ -150,10 +153,10 @@
             }, true);
             item.innerHTML = `
                 <span>
-                    <strong style="color: #1976d2;">${key}</strong>
-                    <span style="color: #666; margin-left: 8px;">${data.desc}</span>
+                    <strong style="color: #1976d2;">${entry.key}</strong>
+                    <span style="color: #666; margin-left: 8px;">${entry.desc}</span>
                 </span>
-                <span style="color: #888; font-size: 11px; font-family: monospace;">${data.part}</span>
+                <span style="color: #888; font-size: 11px; font-family: monospace;">${entry.part}</span>
             `;
             dropdown.appendChild(item);
         });
@@ -186,7 +189,7 @@
 
         const btn = document.createElement('span');
         btn.id = 'partcode-editor-btn';
-        btn.title = 'Partcodes verwalten (' + Object.keys(partcodeMap).length + ' Einträge)';
+        btn.title = 'Partcodes verwalten (' + partcodeMap.length + ' Einträge)';
         btn.style.cssText = `
             display: inline-flex;
             align-items: center;
@@ -210,6 +213,14 @@
             e.preventDefault();
             e.stopPropagation();
             removeDropdown();
+
+            // ✅ Partcode-Textfeld leeren beim Öffnen des Editors
+            const partcodeInput = document.querySelector('input[name="partcode"]');
+            if (partcodeInput) {
+                partcodeInput.value = '';
+                partcodeInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
             openEditor();
         });
 
@@ -224,16 +235,20 @@
 
     function editorRefreshList(container, scrollToBottom = false) {
         container.innerHTML = '';
-        const entries = Object.entries(partcodeMap).sort((a, b) => a[0].localeCompare(b[0]));
 
-        if (entries.length === 0) {
+        const sorted = [...partcodeMap].sort((a, b) => a.key.localeCompare(b.key));
+
+        if (sorted.length === 0) {
             container.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Keine Einträge vorhanden</div>';
             return;
         }
 
-        entries.forEach(([key, data]) => {
+        sorted.forEach((entry) => {
+            // Originalindex im partcodeMap-Array ermitteln
+            const realIndex = partcodeMap.indexOf(entry);
+
             const row = document.createElement('div');
-            row.dataset.originalKey = key;
+            row.dataset.index = realIndex;
             row.style.cssText = `
                 display: flex;
                 align-items: center;
@@ -242,31 +257,31 @@
                 gap: 8px;
             `;
 
-            // ✅ Alias-Feld mit automatischer Kleinschreibung
-            const keyInput = createInlineInput(key, '130px', 'Alias', true);
-            const partInput = createInlineInput(data.part, '110px', 'Partnumber', false);
-            const descInput = createInlineInput(data.desc, '160px', 'Beschreibung', false);
-            const saveBtn = createIconButton('💾', '#28a745', 'Speichern');
-            const delBtn = createIconButton('🗑️', '#dc3545', 'Löschen');
+            const keyInput  = createInlineInput(entry.key,  '130px', 'Alias', true);
+            const partInput = createInlineInput(entry.part, '110px', 'Partnumber', false);
+            const descInput = createInlineInput(entry.desc, '160px', 'Beschreibung', false);
+            const saveBtn   = createIconButton('💾', '#28a745', 'Speichern');
+            const delBtn    = createIconButton('🗑️', '#dc3545', 'Löschen');
 
             saveBtn.onclick = () => {
-                const newKey = keyInput.value.trim();
+                const newKey  = keyInput.value.trim();
                 const newPart = partInput.value.trim();
                 const newDesc = descInput.value.trim();
                 if (!newKey || !newPart) {
                     alert('Alias und Partnumber sind Pflicht!');
                     return;
                 }
-                if (newKey !== key) delete partcodeMap[key];
-                partcodeMap[newKey] = { part: newPart, desc: newDesc };
+                const idx = parseInt(row.dataset.index);
+                partcodeMap[idx] = { key: newKey, part: newPart, desc: newDesc };
                 savePartcodeMap(partcodeMap);
                 editorRefreshList(container);
                 showToast('✅ Gespeichert!');
             };
 
             delBtn.onclick = () => {
-                if (confirm(`"${key}" wirklich löschen?`)) {
-                    delete partcodeMap[key];
+                if (confirm(`"${entry.key}" wirklich löschen?`)) {
+                    const idx = parseInt(row.dataset.index);
+                    partcodeMap.splice(idx, 1);
                     savePartcodeMap(partcodeMap);
                     editorRefreshList(container);
                     showToast('🗑️ Gelöscht!');
@@ -288,31 +303,26 @@
         }
     }
 
-    // ✅ NEU: Save All – liest alle Zeilen auf einmal aus und speichert
     function editorSaveAll(container) {
-        const rows = container.querySelectorAll('div[data-original-key]');
+        const rows = container.querySelectorAll('div[data-index]');
+        const newMap = [];
         let errorFound = false;
-        const newMap = {};
 
         rows.forEach(row => {
-            const inputs = row.querySelectorAll('input');
-            const keyInput  = inputs[0];
-            const partInput = inputs[1];
-            const descInput = inputs[2];
-
-            const newKey  = keyInput.value.trim();
-            const newPart = partInput.value.trim();
-            const newDesc = descInput.value.trim();
+            const inputs  = row.querySelectorAll('input');
+            const newKey  = inputs[0].value.trim();
+            const newPart = inputs[1].value.trim();
+            const newDesc = inputs[2].value.trim();
 
             if (!newKey || !newPart) {
-                keyInput.style.borderColor  = !newKey  ? '#dc3545' : '#ddd';
-                partInput.style.borderColor = !newPart ? '#dc3545' : '#ddd';
+                inputs[0].style.borderColor = !newKey  ? '#dc3545' : '#ddd';
+                inputs[1].style.borderColor = !newPart ? '#dc3545' : '#ddd';
                 errorFound = true;
                 return;
             }
 
-            // Doppelte Keys: letzter Eintrag gewinnt
-            newMap[newKey] = { part: newPart, desc: newDesc };
+            // ✅ Doppelte Keys problemlos möglich
+            newMap.push({ key: newKey, part: newPart, desc: newDesc });
         });
 
         if (errorFound) {
@@ -328,8 +338,8 @@
 
     function editorAddNewEntry() {
         if (!currentEditorList) return;
-        const tempKey = '\uFFFF_new_' + Date.now();
-        partcodeMap[tempKey] = { part: '', desc: '' };
+        // ✅ Leeren Eintrag ins Array pushen
+        partcodeMap.push({ key: '', part: '', desc: '' });
         editorRefreshList(currentEditorList, true);
 
         setTimeout(() => {
@@ -387,7 +397,7 @@
         `;
         header.innerHTML = `
             <h2 style="margin: 0; font-size: 18px; color: #333;">🔧 Partnumber Editor</h2>
-            <span style="color: #666; font-size: 12px;">${Object.keys(partcodeMap).length} Einträge</span>
+            <span style="color: #666; font-size: 12px;">${partcodeMap.length} Einträge</span>
         `;
 
         const toolbar = document.createElement('div');
@@ -401,14 +411,14 @@
             flex-wrap: wrap;
         `;
 
-        const addBtn     = createToolbarButton('➕ New',      '#28a745');
-        const saveAllBtn = createToolbarButton('💾 Save All', '#1976d2'); // ✅ NEU
-        const importBtn  = createToolbarButton('📥 Import',   '#6c757d');
-        const exportBtn  = createToolbarButton('📤 Export',   '#6c757d');
-        const resetBtn   = createToolbarButton('🔄 Reset',    '#dc3545');
+        const addBtn     = createToolbarButton('➕ New',       '#28a745');
+        const saveAllBtn = createToolbarButton('💾 Save All',  '#1976d2');
+        const importBtn  = createToolbarButton('📥 Import',    '#6c757d');
+        const exportBtn  = createToolbarButton('📤 Export',    '#6c757d');
+        const resetBtn   = createToolbarButton('🔄 Reset',     '#dc3545');
 
         addBtn.onclick     = () => editorAddNewEntry();
-        saveAllBtn.onclick = () => editorSaveAll(listContainer);  // ✅ NEU
+        saveAllBtn.onclick = () => editorSaveAll(listContainer);
         importBtn.onclick  = () => importJSON();
         exportBtn.onclick  = () => exportJSON();
         resetBtn.onclick   = () => {
@@ -420,7 +430,7 @@
         };
 
         toolbar.appendChild(addBtn);
-        toolbar.appendChild(saveAllBtn); // ✅ NEU
+        toolbar.appendChild(saveAllBtn);
         toolbar.appendChild(importBtn);
         toolbar.appendChild(exportBtn);
         toolbar.appendChild(resetBtn);
@@ -534,7 +544,6 @@
         return btn;
     }
 
-    // ✅ forceLower Parameter hinzugefügt
     function createInlineInput(value, width, placeholder, forceLower = false) {
         const input = document.createElement('input');
         input.value = value;
@@ -550,7 +559,6 @@
             ${forceLower ? 'text-transform: lowercase;' : ''}
         `;
 
-        // ✅ Wert beim Tippen live in Kleinbuchstaben umwandeln
         if (forceLower) {
             input.addEventListener('input', () => {
                 const pos = input.selectionStart;
@@ -587,13 +595,28 @@
             reader.onload = (event) => {
                 try {
                     const imported = JSON.parse(event.target.result);
-                    for (const [key, val] of Object.entries(imported)) {
-                        if (typeof val !== 'object' || !val.part) {
-                            throw new Error(`Ungültiges Format bei "${key}"`);
+
+                    // ✅ Array-Format unterstützen
+                    let entries = [];
+                    if (Array.isArray(imported)) {
+                        for (const item of imported) {
+                            if (typeof item !== 'object' || !item.key || !item.part) {
+                                throw new Error('Ungültiges Array-Format: jedes Element braucht "key" und "part"');
+                            }
+                        }
+                        entries = imported;
+                    } else {
+                        // Altes Objekt-Format konvertieren
+                        for (const [key, val] of Object.entries(imported)) {
+                            if (typeof val !== 'object' || !val.part) {
+                                throw new Error(`Ungültiges Format bei "${key}"`);
+                            }
+                            entries.push({ key, part: val.part, desc: val.desc || '' });
                         }
                     }
-                    if (confirm(`${Object.keys(imported).length} Einträge importieren?`)) {
-                        Object.assign(partcodeMap, imported);
+
+                    if (confirm(`${entries.length} Einträge importieren?`)) {
+                        partcodeMap.push(...entries);
                         savePartcodeMap(partcodeMap);
                         if (currentEditorList) editorRefreshList(currentEditorList);
                         showToast('📥 Import erfolgreich!');
@@ -740,5 +763,5 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    console.log('[Partcode Auto-Ersetzung v3.9] Geladen. Button: Direkt neben Titel | AutoOpen: AUS');
+    console.log('[Partcode Auto-Ersetzung v4.0] Geladen. Array-Modus aktiv | Doppelte Keys erlaubt');
 })();
