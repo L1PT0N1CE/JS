@@ -9,9 +9,6 @@
     }
 
     function askForUsername(onSuccess) {
-        // Versuche zuerst automatisch aus dem EAM-Login zu lesen
-        const autoDetect = localStorage.getItem('login') || localStorage.getItem('loginKANATAZA') ? null : null;
-
         const overlay = createOverlay();
         overlay.style.zIndex = "999999";
 
@@ -76,6 +73,12 @@
     }
 
     /* ================= HILFSFUNKTIONEN ================= */
+    function getCurrentDate() {
+        const m = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+        const d = new Date();
+        return `${String(d.getDate()).padStart(2, "0")}-${m[d.getMonth()]}-${d.getFullYear()}`;
+    }
+
     function setField(el, val) {
         if (!el) return;
         el.focus();
@@ -94,8 +97,10 @@
         const f1 = document.querySelector('input[name="octype"]');
         const f2 = document.querySelector('input[name="hrswork"]');
         const f3 = document.querySelector('input[name="boodescription"]');
+        const f4 = document.querySelector('input[name="datework"]');
 
         setField(f1, type);
+        setField(f4, getCurrentDate());
         setField(f2, hrs);
         setTimeout(() => setField(f3, text), 200);
     }
@@ -153,6 +158,11 @@
             inputText.value = defaultText;
             inputText.style = "width:200px; padding:6px; margin:5px;";
 
+            // Datum-Anzeige (read-only, wird automatisch gesetzt)
+            const dateInfo = document.createElement("p");
+            dateInfo.innerText = `Datum: ${getCurrentDate()}`;
+            dateInfo.style = "font-size:11px; color:#888; margin:6px 0 0 0;";
+
             const okBtn = document.createElement("button");
             okBtn.innerText = "OK";
             okBtn.style = "padding:6px 12px; margin-top:12px; cursor:pointer;";
@@ -167,6 +177,7 @@
                 inputTime, document.createElement("br"),
                 "Beschreibung:", document.createElement("br"),
                 inputText, document.createElement("br"),
+                dateInfo,
                 okBtn
             );
 
