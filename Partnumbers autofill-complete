@@ -166,9 +166,15 @@
     // EDITOR BUTTON
     // ═══════════════════════════════════════════════════════
     function injectEditorButton() {
-        const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el =>
-            el.textContent.trim() === 'Part Details & Planning'
-        );
+        const acceptedTitles = [
+  'Part Details & Planning',
+  'Teiledetails und Planung'
+];
+
+const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el =>
+  acceptedTitles.includes(el.textContent.trim())
+);
+
         if (!titleEl) return;
         if (titleEl.querySelector('#partcode-editor-btn')) return;
 
