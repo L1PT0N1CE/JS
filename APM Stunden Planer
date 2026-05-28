@@ -1,433 +1,52 @@
-(function() {
-    'use strict';
-    const STORAGE_KEY = "eam_work_hours_db_v4_type_desc";
-    let savedHours = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    let colIdDesc = null;
-    let colIdType = null;
-    let isDragging = false;
-    let dragValue = null;
-    let lastDraggedInput = null;
-    let dragStartTime = 0;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    const DRAG_THRESHOLD = 5;
-    const TIME_THRESHOLD = 200;
-    // ===== SPRACH-MAPPING: Deutsch → Englisch =====
-    // Erweitere diese Liste nach Bedarf!
-    const TYPE_MAPPING = {
-        // Deutsch : Englisch
-        "präventive instandhaltung": "Preventive maintenance",
-        "präventive instandhaltung": "Preventive maintenance",
-        "vorbeugende instandhaltung": "Preventive maintenance",
-        "preventive instandhaltung": "Preventive maintenance",
-        "korrektive instandhaltung": "Corrective maintenance",
-        "corrective instandhaltung": "Corrective maintenance",
-        "arbeit": "Work",
-        "arbeitsauftrag": "Work order",
-        "inspektion": "Inspection",
-        "reparatur": "Repair",
-        "wartung": "Maintenance",
-        "instandhaltung": "Maintenance",
-        "projekt": "Project",
-        "umbau": "Conversion",
-        "installation": "Installation",
-        "demontage": "Dismantling",
-        // Fallback: Wenn der Type unverändert auf Englisch ist
-        "preventive maintenance": "Preventive maintenance",
-        "corrective maintenance": "Corrective maintenance",
-    };
-    function normalizeType(typeText) {
-        const lower = typeText.toLowerCase().trim();
-        // Direkter Treffer im Mapping?
-        if (TYPE_MAPPING[lower]) {
-            return TYPE_MAPPING[lower];
-        }
-        // Versuche fuzzy: enthält ein Mapping-Key den Type?
-        for (const [de, en] of Object.entries(TYPE_MAPPING)) {
-            if (lower.includes(de) || de.includes(lower)) {
-                return en;
-            }
-        }
-        // Kein Mapping gefunden → gib Original zurück (für neue deutsche Einträge)
-        return typeText;
-    }
-    function getCompositeKey(typeText, descText) {
-        const normalizedType = normalizeType(typeText);
-        return `${normalizedType}||${descText}`;
-    }
-    // --- Styles ---
-    GM_addStyle(`
-        #eam-timer-panel {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 500px; max-height: 600px; background: white;
-            border: 1px solid #ccc; border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 99999; display: none; flex-direction: column;
-            font-family: Arial, sans-serif; user-select: none;
-        }
-        #eam-panel-header {
-            padding: 10px; background: #f0f0f0; border-bottom: 1px solid #ddd;
-            display: flex; flex-direction: column; gap: 5px;
-            border-radius: 8px 8px 0 0;
-        }
-        .eam-header-top {
-            display: flex; justify-content: space-between; align-items: center; font-weight: bold;
-        }
-        .eam-header-actions {
-            display: flex; gap: 10px; font-size: 11px; margin-top: 5px;
-        }
-        .eam-action-btn {
-            cursor: pointer; color: #005a9c; text-decoration: none; border: 1px solid #005a9c;
-            padding: 2px 6px; border-radius: 4px; background: white;
-        }
-        .eam-action-btn:hover { background: #eef; }
-        #eam-panel-content {
-            padding: 10px; overflow-y: auto; flex-grow: 1;
-        }
-        .eam-item-row {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee;
-            cursor: default;
-        }
-        .eam-item-info {
-            width: 75%; font-size: 11px; color: #333; line-height: 1.3;
-            pointer-events: none;
-        }
-        .eam-type-badge {
-            display: inline-block; padding: 2px 4px; border-radius: 3px;
-            background: #eee; color: #555; font-weight: bold; margin-right: 5px;
-            font-size: 10px; border: 1px solid #ccc;
-        }
-        .eam-item-input {
-            width: 15%; padding: 4px; border: 1px solid #ddd; border-radius: 4px; text-align: center;
-            cursor: text;
-        }
-        .eam-item-input.drag-source {
-            background-color: #1976d2;
-            color: white;
-        }
-        .eam-item-input.drag-target {
-            background-color: #bbdefb;
-            border-color: #1976d2;
-        }
-        .eam-added-tag {
-            background-color: #dff0d8; color: #3c763d;
-            padding: 1px 5px; margin-left: 10px; border-radius: 3px;
-            font-weight: bold; font-size: 11px; border: 1px solid #d6e9c6;
-            display: inline-block;
-        }
-        .eam-debug-msg {
-            font-size: 10px; color: #999; margin-top: 5px; margin-bottom: 10px;
-        }
-        .eam-drag-hint {
-            font-size: 9px; color: #666; margin-top: 2px; font-style: italic;
-        }
-        .apmod-zeiten-btn {
-            background-color: #005a9c !important;
-            border-color: #004a82 !important;
-            margin-left: 8px !important;
-            margin-right: 8px !important;
-        }
-        .apmod-zeiten-btn .x-btn-inner {
-            color: white !important;
-            font-weight: bold !important;
-        }
-        .apmod-zeiten-btn:hover {
-            background-color: #004a82 !important;
-        }
-        .eam-mapping-info {
-            font-size: 9px; color: #005a9c; margin-top: 2px; font-style: italic;
-        }
-    `);
-    function findColumnIDByText(searchStrings) {
-        const headers = document.querySelectorAll('.x-column-header');
-        for (let header of headers) {
-            const text = (header.textContent || header.innerText || "").toLowerCase();
-            if (searchStrings.some(s => text.includes(s.toLowerCase()))) {
-                let id = header.getAttribute('data-columnid');
-                if (!id && header.id && (header.id.includes("gridcolumn") || header.id.includes("header"))) {
-                    id = header.id;
-                }
-                if (id) return id;
-            }
-        }
-        return null;
-    }
-    function refreshColumnIDs() {
-        colIdType = findColumnIDByText(["Type", "Typ", "Art"]);
-        colIdDesc = findColumnIDByText([
-            "Equipment Description",
-            "Beschreibung",
-            "Anlagenbeschreibung",
-            "Equipmentbeschreibung"
-        ]);
-    }
-    function saveData() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedHours));
-        applyLabelsToGrid();
-    }
-    function exportData() {
-        const dataStr = JSON.stringify(savedHours, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const date = new Date().toISOString().split('T')[0];
-        a.download = `EAM_Zeiten_Backup_${date}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-    function importData() {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.json';
-        input.onchange = e => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = event => {
-                try {
-                    const json = JSON.parse(event.target.result);
-                    if (confirm(`Möchtest du ${Object.keys(json).length} Einträge importieren?`)) {
-                        savedHours = { ...savedHours, ...json };
-                        saveData();
-                        alert("Erfolgreich importiert!");
-                        populatePanel();
+function importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = event => {
+            try {
+                const json = JSON.parse(event.target.result);
+
+                // ===== NEU: Keys beim Import re-normalisieren =====
+                const normalized = {};
+                let remappedCount = 0;
+
+                for (const [key, value] of Object.entries(json)) {
+                    const parts = key.split('||');
+                    if (parts.length === 2) {
+                        const typeRaw = parts[0];
+                        const desc = parts[1];
+                        const normalizedType = normalizeType(typeRaw);
+                        const newKey = `${normalizedType}||${desc}`;
+
+                        if (newKey !== key) remappedCount++;
+                        normalized[newKey] = value;
+                    } else {
+                        // Key hat unerwartetes Format → unverändert übernehmen
+                        normalized[key] = value;
                     }
-                } catch (err) {
-                    alert("Fehler beim Importieren.");
                 }
-            };
-            reader.readAsText(file);
+                // =================================================
+
+                const total = Object.keys(normalized).length;
+                const msg = remappedCount > 0
+                    ? `${total} Einträge importieren?\n(${remappedCount} Keys wurden automatisch re-normalisiert)`
+                    : `${total} Einträge importieren?`;
+
+                if (confirm(msg)) {
+                    savedHours = { ...savedHours, ...normalized };
+                    saveData();
+                    alert(`✅ Erfolgreich importiert!\n${total} Einträge geladen.${remappedCount > 0 ? `\n🔄 ${remappedCount} Keys re-normalisiert (EN→DE-Mapping).` : ''}`);
+                    populatePanel();
+                }
+            } catch (err) {
+                alert("❌ Fehler beim Importieren: " + err.message);
+            }
         };
-        input.click();
-    }
-    function applyLabelsToGrid() {
-        if (!colIdDesc || !colIdType) {
-            refreshColumnIDs();
-            if (!colIdDesc || !colIdType) return;
-        }
-        const cells = document.querySelectorAll(`td[class*="${colIdDesc}"] .x-grid-cell-inner, td[data-columnid="${colIdDesc}"] .x-grid-cell-inner`);
-        cells.forEach(cell => {
-            const row = cell.closest('tr');
-            if (!row) return;
-            const typeCell = row.querySelector(`td[class*="${colIdType}"] .x-grid-cell-inner, td[data-columnid="${colIdType}"] .x-grid-cell-inner`);
-            if (!typeCell) return;
-            const typeText = typeCell.textContent.trim();
-            const existingTag = cell.querySelector('.eam-added-tag');
-            let descText = (cell.childNodes[0] && cell.childNodes[0].nodeType === 3) ?
-                           cell.childNodes[0].textContent.trim() :
-                           cell.innerText.replace(existingTag ? existingTag.innerText : "", "").trim();
-            if (!descText || !typeText) return;
-
-            // Nutze den gemappten Key für Lookup
-            const compositeKey = getCompositeKey(typeText, descText);
-            const timeVal = savedHours[compositeKey];
-
-            if (timeVal) {
-                if (existingTag) {
-                    if (existingTag.innerText !== timeVal) existingTag.innerText = timeVal;
-                } else {
-                    const span = document.createElement('span');
-                    span.className = 'eam-added-tag';
-                    span.innerText = timeVal;
-                    cell.appendChild(span);
-                }
-            } else if (existingTag) {
-                existingTag.remove();
-            }
-        });
-    }
-    function handleMouseDown(e) {
-        if (!e.target.classList.contains('eam-item-input')) return;
-        const input = e.target;
-        if (!input.value) return;
-        dragStartTime = Date.now();
-        dragStartX = e.clientX;
-        dragStartY = e.clientY;
-        dragValue = input.value;
-        lastDraggedInput = input;
-        isDragging = false;
-    }
-    function handleMouseMove(e) {
-        if (!dragValue || !lastDraggedInput) return;
-        const totalDist = Math.sqrt(Math.pow(e.clientX - dragStartX, 2) + Math.pow(e.clientY - dragStartY, 2));
-        if (!isDragging && (totalDist > DRAG_THRESHOLD || (Date.now() - dragStartTime) > TIME_THRESHOLD)) {
-            isDragging = true;
-            lastDraggedInput.classList.add('drag-source');
-            lastDraggedInput.style.cursor = 'crosshair';
-            e.preventDefault();
-        }
-        if (!isDragging) return;
-        const target = document.elementFromPoint(e.clientX, e.clientY);
-        const input = target?.closest('.eam-item-input');
-        if (input && input !== lastDraggedInput) {
-            if (input.value !== dragValue) {
-                input.value = dragValue;
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-                input.classList.add('drag-target');
-                setTimeout(() => input.classList.remove('drag-target'), 200);
-            }
-            lastDraggedInput = input;
-        }
-    }
-    function handleMouseUp(e) {
-        if (!isDragging && e.target.classList.contains('eam-item-input')) {
-            setTimeout(() => e.target.focus(), 0);
-        } else if (isDragging) {
-            e.preventDefault();
-        }
-        if (lastDraggedInput) {
-            lastDraggedInput.classList.remove('drag-source');
-            lastDraggedInput.style.cursor = 'text';
-        }
-        isDragging = false;
-        dragValue = null;
-        lastDraggedInput = null;
-    }
-    function createPanel() {
-        const panel = document.createElement('div');
-        panel.id = 'eam-timer-panel';
-        panel.innerHTML = `
-            <div id="eam-panel-header">
-                <div class="eam-header-top">
-                    <span>⏱️ Stunden Planer (Type + Equipment)</span>
-                    <span style="cursor:pointer; font-weight:bold;" onclick="document.getElementById('eam-timer-panel').style.display='none'">✖</span>
-                </div>
-                <div class="eam-header-actions">
-                    <span id="eam-refresh-btn" class="eam-action-btn">🔄 Refresh</span>
-                    <span id="eam-export-btn" class="eam-action-btn">💾 Export</span>
-                    <span id="eam-import-btn" class="eam-action-btn">📂 Import</span>
-                </div>
-                <div class="eam-drag-hint">💡 Tipp: Wert eingeben, ziehen zum Ausfüllen | Klicken zum Bearbeiten</div>
-                <div class="eam-mapping-info">🌐 Auto-Mapping: DE ↔ EN aktiviert</div>
-            </div>
-            <div id="eam-panel-content">
-                <div id="eam-debug-info" class="eam-debug-msg"></div>
-                <div id="eam-list-container"></div>
-            </div>
-        `;
-        document.body.appendChild(panel);
-        document.getElementById('eam-refresh-btn').addEventListener('click', populatePanel);
-        document.getElementById('eam-export-btn').addEventListener('click', exportData);
-        document.getElementById('eam-import-btn').addEventListener('click', importData);
-    }
-    function populatePanel() {
-        const container = document.getElementById('eam-list-container');
-        const debugInfo = document.getElementById('eam-debug-info');
-        container.innerHTML = '';
-        refreshColumnIDs();
-        if (!colIdDesc || !colIdType) {
-            debugInfo.innerHTML = `<span style="color:red">Spalten fehlen: Type: ${colIdType || 'X'} | Desc: ${colIdDesc || 'X'}</span>`;
-            return;
-        }
-        debugInfo.innerHTML = `<span style="color:green">Verbunden. Type: ${colIdType} | Desc: ${colIdDesc}</span>`;
-        const foundItems = new Map();
-        document.querySelectorAll('tr.x-grid-row').forEach(row => {
-            const tCell = row.querySelector(`td[class*="${colIdType}"] .x-grid-cell-inner, td[data-columnid="${colIdType}"] .x-grid-cell-inner`);
-            const dCell = row.querySelector(`td[class*="${colIdDesc}"] .x-grid-cell-inner, td[data-columnid="${colIdDesc}"] .x-grid-cell-inner`);
-            if (tCell && dCell) {
-                const tText = tCell.textContent.trim();
-                const dText = (dCell.childNodes[0] && dCell.childNodes[0].nodeType === 3) ? dCell.childNodes[0].textContent.trim() : dCell.innerText.split("\n")[0].trim();
-                if (tText && dText) {
-                    // Nutze den gemappten Key
-                    const compKey = getCompositeKey(tText, dText);
-                    // Speichere auch den Original-Type für die Anzeige
-                    if (!foundItems.has(compKey)) foundItems.set(compKey, {
-                        type: tText,
-                        desc: dText,
-                        key: compKey,
-                        mappedType: normalizeType(tText)
-                    });
-                }
-            }
-        });
-        if (foundItems.size === 0) {
-            container.innerHTML = '<i>Keine Einträge. Bitte scrolle durch die Tabelle.</i>';
-            return;
-        }
-        Array.from(foundItems.values()).sort((a, b) => a.type.localeCompare(b.type) || a.desc.localeCompare(b.desc)).forEach(item => {
-            const row = document.createElement('div');
-            row.className = 'eam-item-row';
-            const info = document.createElement('div');
-            info.className = 'eam-item-info';
-
-            // Zeige Mapping-Info wenn unterschiedlich
-            const showMapping = item.type !== item.mappedType;
-            const mappingHint = showMapping ? ` <span style="color:#005a9c;font-size:9px">→ ${item.mappedType}</span>` : '';
-            info.innerHTML = `<span class="eam-type-badge">${item.type}</span>${mappingHint}<br>${item.desc}`;
-
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'eam-item-input';
-            input.dataset.key = item.key;
-
-            if (savedHours[item.key]) {
-                input.value = savedHours[item.key];
-                row.style.backgroundColor = "#f9fff9";
-            }
-
-            input.addEventListener('input', (e) => {
-                const val = e.target.value.trim();
-                if (val) {
-                    savedHours[item.key] = val;
-                    row.style.backgroundColor = "#f9fff9";
-                } else {
-                    delete savedHours[item.key];
-                    row.style.backgroundColor = "transparent";
-                }
-                saveData();
-            });
-            row.append(info, input);
-            container.appendChild(row);
-        });
-        const list = document.getElementById('eam-list-container');
-        list.onmousedown = handleMouseDown;
-        list.onmousemove = handleMouseMove;
-        list.onmouseup = handleMouseUp;
-        list.onmouseleave = handleMouseUp;
-    }
-    function togglePanel() {
-        const p = document.getElementById('eam-timer-panel');
-        p.style.display = (p.style.display === 'none' || p.style.display === '') ? 'flex' : 'none';
-        if (p.style.display === 'flex') populatePanel();
-    }
-    function injectToolbarButton() {
-        if (typeof Ext === 'undefined' || typeof EAM?.view?.common?.grids?.core?.Dataspy === 'undefined') {
-            setTimeout(injectToolbarButton, 500); return;
-        }
-        const DSclass = EAM.view.common.grids.core.Dataspy;
-        if (DSclass.prototype.kanatazaZeitenInjected) return;
-        DSclass.prototype.kanatazaZeitenInjected = true;
-        DSclass.prototype.kanatazaOrigInitComponent = DSclass.prototype.initComponent;
-        DSclass.prototype.initComponent = function() {
-            this.kanatazaOrigInitComponent.apply(this, arguments);
-            let editItemIndex = -1;
-            this.items.each(function(item, index) {
-                if (item.text === "Edit" || item.text === "Bearbeiten" || (item.actionName && item.actionName.includes('EDIT'))) {
-                    editItemIndex = index;
-                    return false;
-                }
-            });
-            let targetIndex = (editItemIndex !== -1) ? (editItemIndex + 1) : 3;
-            this.insert(targetIndex, {
-                xtype: 'button',
-                text: "⏱️ Zeiten",
-                tooltip: "Stunden Planer öffnen",
-                cls: 'apmod-zeiten-btn',
-                handler: togglePanel
-            });
-            console.log("[Kanataza Zeiten] Button an Position " + targetIndex + " eingefügt.");
-        };
-    }
-    function init() {
-        createPanel();
-        injectToolbarButton();
-        setTimeout(() => { refreshColumnIDs(); applyLabelsToGrid(); }, 1000);
-        setInterval(applyLabelsToGrid, 1000);
-    }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
-})();
+        reader.readAsText(file);
+    };
+    input.click();
+}
