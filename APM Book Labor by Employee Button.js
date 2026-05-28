@@ -76,10 +76,20 @@ function ensureUsername(callback) {
 
 function getCurrentDate() {
   const monthsEN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  const monthsDE = ["JAN", "FEB", "MRZ", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEZ"];
+  const monthsDE = ["JAN", "FEB", "MRZ", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
 
-  const lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-  const isDE = lang.startsWith("de");
+  // Prüft die Sprache der Seite selbst, nicht den Browser
+  const htmlLang = (document.documentElement.lang || "").toLowerCase();
+  const bodyText = document.body.innerText || "";
+
+  // Erkennung über HTML lang-Attribut ODER deutschen Text auf der Seite
+  const isDE =
+    htmlLang.startsWith("de") ||
+    navigator.language.toLowerCase().startsWith("de") ||
+    bodyText.includes("Arbeitsdatum") ||
+    bodyText.includes("Ungültiges Datum") ||
+    bodyText.includes("Buchung") ||
+    bodyText.includes("Speichern");
 
   const m = isDE ? monthsDE : monthsEN;
   const d = new Date();
