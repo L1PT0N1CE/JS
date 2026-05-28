@@ -75,7 +75,13 @@ function ensureUsername(callback) {
 /* ================= HILFSFUNKTIONEN ================= */
 
 function getCurrentDate() {
-  const m = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const monthsEN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const monthsDE = ["JAN", "FEB", "MRZ", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEZ"];
+
+  const lang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
+  const isDE = lang.startsWith("de");
+
+  const m = isDE ? monthsDE : monthsEN;
   const d = new Date();
   return `${String(d.getDate()).padStart(2, "0")}-${m[d.getMonth()]}-${d.getFullYear()}`;
 }
