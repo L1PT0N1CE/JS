@@ -78,18 +78,9 @@ function getCurrentDate() {
   const monthsEN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   const monthsDE = ["JAN", "FEB", "MRZ", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEC"];
 
-  // Prüft die Sprache der Seite selbst, nicht den Browser
-  const htmlLang = (document.documentElement.lang || "").toLowerCase();
-  const bodyText = document.body.innerText || "";
-
-  // Erkennung über HTML lang-Attribut ODER deutschen Text auf der Seite
-  const isDE =
-    htmlLang.startsWith("de") ||
-    navigator.language.toLowerCase().startsWith("de") ||
-    bodyText.includes("Arbeitsdatum") ||
-    bodyText.includes("Ungültiges Datum") ||
-    bodyText.includes("Buchung") ||
-    bodyText.includes("Speichern");
+  // Sucht alle Label-Texte auf der Seite und prüft auf deutschen Begriff
+  const allLabels = Array.from(document.querySelectorAll('.x-form-item-label-text'));
+  const isDE = allLabels.some(el => el.innerText.trim() === "Arbeitsdatum:");
 
   const m = isDE ? monthsDE : monthsEN;
   const d = new Date();
