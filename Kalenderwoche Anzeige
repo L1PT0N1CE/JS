@@ -62,38 +62,31 @@
 
   // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
 
-  function applyWhite(el) {
-    // setProperty mit 'important' schlägt JEDES externe CSS
-    el.style.setProperty('color', '#ffffff', 'important');
-    el.style.setProperty('fill', '#ffffff', 'important');
-  }
-
   function createKWBadge() {
     const kw = getISOWeekNumber(new Date());
 
-    const wrapper = document.createElement('div');
-    wrapper.id = 'kw-sharepoint-badge';
+    // Wrapper: gleiche Struktur wie M3pcB5evSAtYMozck1WU7A== Container
+    const container = document.createElement('div');
+    container.id = 'kw-sharepoint-badge';
 
-    // Exakt gleiche Struktur wie Bh46b1rd8BrU4zolL9RzUg== Container (height:100%, line-height:48px, display:flex)
-    wrapper.style.setProperty('height', '100%', 'important');
-    wrapper.style.setProperty('line-height', '48px', 'important');
-    wrapper.style.setProperty('display', 'flex', 'important');
-    wrapper.style.setProperty('align-items', 'center', 'important');
-    wrapper.style.setProperty('justify-content', 'center', 'important');
-    wrapper.style.setProperty('padding', '0 8px', 'important');
-    wrapper.style.setProperty('cursor', 'default', 'important');
-    wrapper.style.setProperty('user-select', 'none', 'important');
-    wrapper.style.setProperty('flex-shrink', '0', 'important');
-    wrapper.style.setProperty('color', '#ffffff', 'important');
-    wrapper.style.setProperty('fill', '#ffffff', 'important');
-    wrapper.style.setProperty('box-sizing', 'border-box', 'important');
+    // Inline-Flex Container wie die anderen _container divs
+    container.style.setProperty('display', 'inline-flex', 'important');
+    container.style.setProperty('align-items', 'center', 'important');
+    container.style.setProperty('height', '100%', 'important');
+    container.style.setProperty('flex-shrink', '0', 'important');
+    container.style.setProperty('padding', '0 4px', 'important');
 
+    // Innerer Button-ähnlicher Div
     const inner = document.createElement('div');
-    inner.style.setProperty('display', 'flex', 'important');
+    inner.style.setProperty('display', 'inline-flex', 'important');
     inner.style.setProperty('align-items', 'center', 'important');
-    inner.style.setProperty('gap', '5px', 'important');
-    inner.style.setProperty('color', '#ffffff', 'important');
-    inner.style.setProperty('fill', '#ffffff', 'important');
+    inner.style.setProperty('justify-content', 'center', 'important');
+    inner.style.setProperty('gap', '4px', 'important');
+    inner.style.setProperty('height', '100%', 'important');
+    inner.style.setProperty('padding', '0 6px', 'important');
+    inner.style.setProperty('cursor', 'default', 'important');
+    inner.style.setProperty('user-select', 'none', 'important');
+    inner.style.setProperty('min-width', '48px', 'important');
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -106,41 +99,38 @@
     svg.innerHTML = `<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>`;
 
     const text = document.createElement('span');
-    text.style.setProperty('font-family', '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif', 'important');
+    text.style.setProperty('font-family', '"Segoe UI", -apple-system, sans-serif', 'important');
     text.style.setProperty('font-size', '13px', 'important');
     text.style.setProperty('font-weight', '700', 'important');
     text.style.setProperty('color', '#ffffff', 'important');
     text.style.setProperty('white-space', 'nowrap', 'important');
-    text.style.setProperty('line-height', '48px', 'important');
-    text.style.setProperty('-webkit-font-smoothing', 'antialiased', 'important');
+    text.style.setProperty('line-height', '1', 'important');
     text.textContent = `KW ${kw}`;
 
     inner.appendChild(svg);
     inner.appendChild(text);
-    wrapper.appendChild(inner);
-    return wrapper;
+    container.appendChild(inner);
+    return container;
   }
 
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // Beide Elemente müssen existieren und Geschwister sein
-    const rightRegion = document.getElementById('O365_HeaderRightRegion');
-    const headerRegion = document.getElementById('HeaderButtonRegion');
-
-    if (!rightRegion) return; // noch nicht geladen, Observer holt es nach
-
-    // Prüfe ob sie wirklich Geschwister sind
-    if (rightRegion.parentNode && headerRegion &&
-        rightRegion.parentNode === headerRegion.parentNode) {
-      // Perfekt: zwischen HeaderButtonRegion und O365_HeaderRightRegion
-      rightRegion.parentNode.insertBefore(createKWBadge(), rightRegion);
+    // Ziel: ans ENDE von #HeaderButtonRegion (nach Help-Container)
+    // HeaderButtonRegion ist der einzige stabile flex-Container der nicht abschneidet
+    const helpContainer = document.getElementById('O365_MainLink_Help_container');
+    if (helpContainer && helpContainer.parentNode &&
+        helpContainer.parentNode.id === 'HeaderButtonRegion') {
+      // Direkt nach Help einfügen = letztes Element in HeaderButtonRegion
+      const parent = helpContainer.parentNode;
+      parent.insertBefore(createKWBadge(), helpContainer.nextSibling);
       return;
     }
 
-    // Fallback: direkt vor rightRegion egal wo
-    if (rightRegion.parentNode) {
-      rightRegion.parentNode.insertBefore(createKWBadge(), rightRegion);
+    // Fallback: einfach ans Ende von HeaderButtonRegion
+    const headerButtonRegion = document.getElementById('HeaderButtonRegion');
+    if (headerButtonRegion) {
+      headerButtonRegion.appendChild(createKWBadge());
     }
   }
 
