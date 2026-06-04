@@ -1,3 +1,17 @@
+// ==UserScript==
+// @name         KW Button (Quip + SharePoint + Office Online)
+// @namespace    http://tampermonkey.net/
+// @version      2.4
+// @description  Zeigt die aktuelle Kalenderwoche in Quip, SharePoint und Office Online an
+// @match        https://quip.com/*
+// @match        https://amazondeu.sharepoint.com/*
+// @match        https://*.officeapps.live.com/*
+// @match        https://excel.cloud.microsoft/*
+// @match        https://word.cloud.microsoft/*
+// @match        https://powerpoint.cloud.microsoft/*
+// @grant        none
+// ==/UserScript==
+
 (function () {
   'use strict';
 
@@ -76,7 +90,7 @@
       align-items: center !important;
       justify-content: center;
       gap: 4px;
-      height: 60px;
+      height: 55px;
       padding: 0 8px;
       color: #ffffff;
       font-family: "Segoe UI", -apple-system, sans-serif;
