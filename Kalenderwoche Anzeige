@@ -127,11 +127,11 @@
     helpContainer.parentNode.insertBefore(createKWBadge(), helpContainer.nextSibling);
   }
 
-  // ─── ROUTING & OBSERVER ──────────────────────────────────────────────────────
+  // ─── ROUTING ─────────────────────────────────────────────────────────────────
 
   function injectKWButton() {
     const host = window.location.hostname;
-    if (host.includes('quip.com')) {
+    if (host.includes('quip-amazon.com')) {
       injectKWButtonQuip();
     } else if (host.includes('sharepoint.com')) {
       injectKWButtonSharePoint();
@@ -143,14 +143,12 @@
   setInterval(() => {
     const newKw = getISOWeekNumber(new Date());
 
-    // Quip
     const quipButton = document.getElementById('kw-quip-button');
     if (quipButton) {
       const span = quipButton.querySelector('span');
       if (span) span.textContent = `KW ${newKw}`;
     }
 
-    // SharePoint
     const spText = document.querySelector('#kw-sharepoint-badge span');
     if (spText) spText.textContent = `KW ${newKw}`;
   }, 3600000);
@@ -163,8 +161,6 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Quip: sofort ausführen (Seite ist synchron)
-  // SharePoint: verzögert weil Header lazy lädt
   injectKWButton();
   setTimeout(injectKWButton, 2000);
   setTimeout(injectKWButton, 4000);
