@@ -65,28 +65,17 @@
   function createKWBadge() {
     const kw = getISOWeekNumber(new Date());
 
-    // Wrapper: gleiche Struktur wie M3pcB5evSAtYMozck1WU7A== Container
     const container = document.createElement('div');
     container.id = 'kw-sharepoint-badge';
-
-    // Inline-Flex Container wie die anderen _container divs
     container.style.setProperty('display', 'inline-flex', 'important');
     container.style.setProperty('align-items', 'center', 'important');
+    container.style.setProperty('justify-content', 'center', 'important');
     container.style.setProperty('height', '100%', 'important');
     container.style.setProperty('flex-shrink', '0', 'important');
-    container.style.setProperty('padding', '0 4px', 'important');
-
-    // Innerer Button-ähnlicher Div
-    const inner = document.createElement('div');
-    inner.style.setProperty('display', 'inline-flex', 'important');
-    inner.style.setProperty('align-items', 'center', 'important');
-    inner.style.setProperty('justify-content', 'center', 'important');
-    inner.style.setProperty('gap', '4px', 'important');
-    inner.style.setProperty('height', '100%', 'important');
-    inner.style.setProperty('padding', '0 6px', 'important');
-    inner.style.setProperty('cursor', 'default', 'important');
-    inner.style.setProperty('user-select', 'none', 'important');
-    inner.style.setProperty('min-width', '48px', 'important');
+    container.style.setProperty('padding', '0 6px', 'important');
+    container.style.setProperty('cursor', 'default', 'important');
+    container.style.setProperty('user-select', 'none', 'important');
+    container.style.setProperty('gap', '4px', 'important');
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -104,34 +93,30 @@
     text.style.setProperty('font-weight', '700', 'important');
     text.style.setProperty('color', '#ffffff', 'important');
     text.style.setProperty('white-space', 'nowrap', 'important');
-    text.style.setProperty('line-height', '1', 'important');
     text.textContent = `KW ${kw}`;
 
-    inner.appendChild(svg);
-    inner.appendChild(text);
-    container.appendChild(inner);
+    container.appendChild(svg);
+    container.appendChild(text);
     return container;
   }
 
   function injectKWButtonSharePoint() {
-    if (document.getElementById('kw-sharepoint-badge')) return;
+    // Altes Badge entfernen falls es am falschen Ort sitzt
+    const existing = document.getElementById('kw-sharepoint-badge');
+    if (existing) {
+      // Prüfe ob es am richtigen Ort ist
+      if (existing.parentNode?.id === 'HeaderButtonRegion') return;
+      // Falscher Ort - entfernen und neu einfügen
+      existing.remove();
+    }
 
-    // Ziel: ans ENDE von #HeaderButtonRegion (nach Help-Container)
-    // HeaderButtonRegion ist der einzige stabile flex-Container der nicht abschneidet
+    // NUR einfügen wenn Help_container wirklich in HeaderButtonRegion sitzt
     const helpContainer = document.getElementById('O365_MainLink_Help_container');
-    if (helpContainer && helpContainer.parentNode &&
-        helpContainer.parentNode.id === 'HeaderButtonRegion') {
-      // Direkt nach Help einfügen = letztes Element in HeaderButtonRegion
-      const parent = helpContainer.parentNode;
-      parent.insertBefore(createKWBadge(), helpContainer.nextSibling);
-      return;
-    }
+    if (!helpContainer) return;
+    if (helpContainer.parentNode?.id !== 'HeaderButtonRegion') return;
 
-    // Fallback: einfach ans Ende von HeaderButtonRegion
-    const headerButtonRegion = document.getElementById('HeaderButtonRegion');
-    if (headerButtonRegion) {
-      headerButtonRegion.appendChild(createKWBadge());
-    }
+    // Jetzt sicher: nach Help einfügen
+    helpContainer.parentNode.insertBefore(createKWBadge(), helpContainer.nextSibling);
   }
 
   // ─── ROUTING ─────────────────────────────────────────────────────────────────
@@ -157,22 +142,16 @@
 
   // ─── OBSERVER ────────────────────────────────────────────────────────────────
 
-  let injected = false;
-
   const observer = new MutationObserver(() => {
-    const badgeId = window.location.hostname.includes('quip.com')
-      ? 'kw-quip-button' : 'kw-sharepoint-badge';
-    if (injected && document.getElementById(badgeId)) return;
-    injected = false;
     injectKWButton();
-    injected = !!document.getElementById(badgeId);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  injectKWButton();
-  setTimeout(injectKWButton, 500);
-  setTimeout(injectKWButton, 1500);
-  setTimeout(injectKWButton, 3000);
+  // Kein früher Aufruf mehr - nur über Observer sobald DOM bereit ist
+  // Kurzer initialer Versuch nach garantiert ausreichend Zeit
+  setTimeout(injectKWButton, 2000);
+  setTimeout(injectKWButton, 4000);
+  setTimeout(injectKWButton, 7000);
 
 })();
