@@ -18,6 +18,7 @@
     if (document.getElementById('kw-quip-button')) return;
 
     const kw = getISOWeekNumber(new Date());
+
     const kwWrapper = document.createElement('div');
     kwWrapper.id = 'kw-quip-button';
     kwWrapper.style.display = 'inline-flex';
@@ -29,17 +30,28 @@
     kwButton.setAttribute('aria-label', `Kalenderwoche ${kw}`);
     kwButton.style.cssText = `
       background-color: rgb(var(--quipAction));
-      height: 32px; padding-left: 12px; padding-right: 12px;
-      color: #fff; fill: #fff; border: none; border-radius: 4px;
+      height: 32px;
+      padding-left: 12px;
+      padding-right: 12px;
+      color: rgb(255, 255, 255);
+      fill: rgb(255, 255, 255);
+      border: none;
+      border-radius: 4px;
       cursor: default;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px; font-weight: 500; line-height: 32px;
-      display: flex; align-items: center; gap: 6px;
-      margin-right: 4px; user-select: none;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 4px;
+      user-select: none;
     `;
 
     const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     iconSvg.setAttribute('viewBox', '0 0 24 24');
+    iconSvg.setAttribute('preserveAspectRatio', 'xMidYMid');
     iconSvg.setAttribute('width', '16');
     iconSvg.setAttribute('height', '16');
     iconSvg.style.fill = 'currentColor';
@@ -48,6 +60,7 @@
 
     const textSpan = document.createElement('span');
     textSpan.textContent = `KW ${kw}`;
+
     kwButton.appendChild(iconSvg);
     kwButton.appendChild(textSpan);
     kwWrapper.appendChild(kwButton);
@@ -101,25 +114,20 @@
   }
 
   function injectKWButtonSharePoint() {
-    // Altes Badge entfernen falls es am falschen Ort sitzt
     const existing = document.getElementById('kw-sharepoint-badge');
     if (existing) {
-      // Prüfe ob es am richtigen Ort ist
       if (existing.parentNode?.id === 'HeaderButtonRegion') return;
-      // Falscher Ort - entfernen und neu einfügen
       existing.remove();
     }
 
-    // NUR einfügen wenn Help_container wirklich in HeaderButtonRegion sitzt
     const helpContainer = document.getElementById('O365_MainLink_Help_container');
     if (!helpContainer) return;
     if (helpContainer.parentNode?.id !== 'HeaderButtonRegion') return;
 
-    // Jetzt sicher: nach Help einfügen
     helpContainer.parentNode.insertBefore(createKWBadge(), helpContainer.nextSibling);
   }
 
-  // ─── ROUTING ─────────────────────────────────────────────────────────────────
+  // ─── ROUTING & OBSERVER ──────────────────────────────────────────────────────
 
   function injectKWButton() {
     const host = window.location.hostname;
@@ -130,12 +138,19 @@
     }
   }
 
-  // ─── KW AKTUALISIERUNG ───────────────────────────────────────────────────────
+  // ─── KW AKTUALISIERUNG (stündlich) ───────────────────────────────────────────
 
   setInterval(() => {
     const newKw = getISOWeekNumber(new Date());
-    const quipSpan = document.querySelector('#kw-quip-button span');
-    if (quipSpan) quipSpan.textContent = `KW ${newKw}`;
+
+    // Quip
+    const quipButton = document.getElementById('kw-quip-button');
+    if (quipButton) {
+      const span = quipButton.querySelector('span');
+      if (span) span.textContent = `KW ${newKw}`;
+    }
+
+    // SharePoint
     const spText = document.querySelector('#kw-sharepoint-badge span');
     if (spText) spText.textContent = `KW ${newKw}`;
   }, 3600000);
@@ -148,8 +163,9 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Kein früher Aufruf mehr - nur über Observer sobald DOM bereit ist
-  // Kurzer initialer Versuch nach garantiert ausreichend Zeit
+  // Quip: sofort ausführen (Seite ist synchron)
+  // SharePoint: verzögert weil Header lazy lädt
+  injectKWButton();
   setTimeout(injectKWButton, 2000);
   setTimeout(injectKWButton, 4000);
   setTimeout(injectKWButton, 7000);
