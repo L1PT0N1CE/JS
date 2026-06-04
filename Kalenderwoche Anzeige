@@ -62,23 +62,40 @@
 
   // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
 
+  function injectStyle() {
+    if (document.getElementById('kw-sharepoint-style')) return;
+    const style = document.createElement('style');
+    style.id = 'kw-sharepoint-style';
+    style.textContent = `
+      #kw-sharepoint-badge,
+      #kw-sharepoint-badge *,
+      #kw-sharepoint-badge span,
+      #kw-sharepoint-badge svg {
+        color: #ffffff !important;
+        fill: #ffffff !important;
+        font-weight: 700 !important;
+        -webkit-font-smoothing: antialiased;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function createKWBadge() {
     const kw = getISOWeekNumber(new Date());
 
-    // Wrapper wie Bh46b1rd8BrU4zolL9RzUg== (height:100%, line-height:48px, display:flex)
     const wrapper = document.createElement('div');
     wrapper.id = 'kw-sharepoint-badge';
     wrapper.style.cssText = `
       height: 100%;
       line-height: 48px;
-      display: flex;
+      display: flex !important;
       align-items: center;
       justify-content: center;
       padding: 0 8px;
       cursor: default;
       user-select: none;
-      color: #ffffff;
       flex-shrink: 0;
+      color: #ffffff !important;
     `;
 
     const inner = document.createElement('div');
@@ -87,7 +104,7 @@
       align-items: center;
       justify-content: center;
       gap: 5px;
-      color: #ffffff;
+      color: #ffffff !important;
     `;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -95,15 +112,15 @@
     svg.setAttribute('width', '16');
     svg.setAttribute('height', '16');
     svg.setAttribute('aria-hidden', 'true');
-    svg.style.cssText = `fill: #ffffff; flex-shrink: 0; display: block;`;
+    svg.style.cssText = `fill: #ffffff !important; flex-shrink: 0; display: block;`;
     svg.innerHTML = `<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>`;
 
     const text = document.createElement('span');
     text.style.cssText = `
-      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      color: #ffffff;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif !important;
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      color: #ffffff !important;
       white-space: nowrap;
       line-height: 48px;
     `;
@@ -118,15 +135,14 @@
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // #HeaderButtonRegion und #O365_HeaderRightRegion sind Geschwister
-    // Badge muss ZWISCHEN diesen beiden eingefügt werden
+    injectStyle();
+
     const rightRegion = document.getElementById('O365_HeaderRightRegion');
     if (rightRegion && rightRegion.parentNode) {
       rightRegion.parentNode.insertBefore(createKWBadge(), rightRegion);
       return;
     }
 
-    // Fallback: ans Ende von HeaderButtonRegion
     const headerButtonRegion = document.getElementById('HeaderButtonRegion');
     if (headerButtonRegion) {
       headerButtonRegion.appendChild(createKWBadge());
