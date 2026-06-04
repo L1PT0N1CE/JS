@@ -109,45 +109,46 @@
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // Strategie 1: direkt vor #mectrl_headerPicture
-    const profilePic = document.getElementById('mectrl_headerPicture');
-    if (profilePic) {
-      const parent = profilePic.closest('[id*="mectrl"]')?.parentNode
-                  || profilePic.parentNode;
-      if (parent) {
-        // Stelle sicher dass der Container flex ist
-        const computedDisplay = window.getComputedStyle(parent).display;
-        if (!computedDisplay.includes('flex')) {
-          parent.style.display = 'inline-flex';
-          parent.style.alignItems = 'center';
-        }
-        parent.insertBefore(createKWBadge(), profilePic.closest('[id*="mectrl"]') || profilePic);
-        return;
-      }
-    }
+    // PRIMÄR: Warte auf den mectrl_headerPicture Container im O365_NavHeader
+    // Das Profilbild-ELTERNELEMENT ist immer da, auch wenn das Bild lazy lädt
+    const navHeader = document.getElementById('O365_NavHeader')
+                   || document.querySelector('[data-automationid="SuiteHeader"]')
+                   || document.querySelector('.o365cs-nav-header-inner')
+                   || document.querySelector('[class*="headerContainer"]');
 
-    // Strategie 2: Vor dem letzten Element in #HeaderButtonRegion
-    const headerRegion = document.getElementById('HeaderButtonRegion');
-    if (headerRegion) {
-      // Finde den Settings-Container als Anker
-      const settingsContainer = document.getElementById('O365_MainLink_Settings_container')
-                             || document.getElementById('O365_MainLink_Help_container');
-      if (settingsContainer) {
-        headerRegion.insertBefore(createKWBadge(), settingsContainer);
-        return;
+    if (!navHeader) return;
+
+    // Suche den rechten Bereich der Nav-Bar (wo Profilbild & Buttons sitzen)
+    // Anker: O365_MainLink_Help ist immer vorhanden (letzter Button vor Profilbild)
+    const helpContainer = document.getElementById('O365_MainLink_Help_container');
+    const settingsContainer = document.getElementById('O365_MainLink_Settings_container');
+    const headerButtonRegion = document.getElementById('HeaderButtonRegion');
+
+    if (helpContainer && helpContainer.parentNode) {
+      // Füge KW Badge nach dem Help-Button ein (direkt vor dem Profilbild)
+      const parent = helpContainer.parentNode;
+      const next = helpContainer.nextSibling;
+      if (next) {
+        parent.insertBefore(createKWBadge(), next);
+      } else {
+        parent.appendChild(createKWBadge());
       }
-      // Fallback: ans Ende von HeaderButtonRegion
-      headerRegion.appendChild(createKWBadge());
       return;
     }
 
-    // Strategie 3: Suche nach dem Suite-Nav-Bar
-    const suiteBar = document.querySelector('[data-automationid="SuiteHeader"]')
-                  || document.querySelector('#O365_HeaderLeftRegion')
-                  || document.querySelector('.o365cs-nav-header');
-    if (suiteBar) {
-      suiteBar.appendChild(createKWBadge());
+    if (settingsContainer && settingsContainer.parentNode) {
+      const parent = settingsContainer.parentNode;
+      parent.insertBefore(createKWBadge(), settingsContainer.nextSibling || settingsContainer);
+      return;
     }
+
+    if (headerButtonRegion) {
+      headerButtonRegion.appendChild(createKWBadge());
+      return;
+    }
+
+    // Letzter Fallback: ans Ende der NavBar
+    navHeader.appendChild(createKWBadge());
   }
 
   // ─── ROUTING ─────────────────────────────────────────────────────────────────
@@ -179,11 +180,12 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // ─── INITIALER AUFRUF MIT VERZÖGERUNG ────────────────────────────────────────
-  // SharePoint lädt die Header-Elemente verzögert nach
+  // ─── GESTAFFELTER START ───────────────────────────────────────────────────────
+  // Mehrere Versuche weil SharePoint den Header in Wellen lädt
 
   injectKWButton();
-  setTimeout(injectKWButton, 1000);
+  setTimeout(injectKWButton, 500);
+  setTimeout(injectKWButton, 1500);
   setTimeout(injectKWButton, 3000);
   setTimeout(injectKWButton, 6000);
 
