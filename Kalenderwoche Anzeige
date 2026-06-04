@@ -75,7 +75,7 @@
       gap: 5px;
       height: 32px;
       padding: 0 10px;
-      margin-right: 8px;
+      margin-right: 4px;
       background-color: rgba(255,255,255,0.15);
       color: #ffffff;
       font-family: "Segoe UI", -apple-system, sans-serif;
@@ -87,7 +87,6 @@
       user-select: none;
       white-space: nowrap;
       flex-shrink: 0;
-      z-index: 9999;
     `;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -109,46 +108,20 @@
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // PRIMÄR: Warte auf den mectrl_headerPicture Container im O365_NavHeader
-    // Das Profilbild-ELTERNELEMENT ist immer da, auch wenn das Bild lazy lädt
-    const navHeader = document.getElementById('O365_NavHeader')
-                   || document.querySelector('[data-automationid="SuiteHeader"]')
-                   || document.querySelector('.o365cs-nav-header-inner')
-                   || document.querySelector('[class*="headerContainer"]');
-
-    if (!navHeader) return;
-
-    // Suche den rechten Bereich der Nav-Bar (wo Profilbild & Buttons sitzen)
-    // Anker: O365_MainLink_Help ist immer vorhanden (letzter Button vor Profilbild)
+    // #HeaderButtonRegion ist der stabile Container mit allen Buttons
+    // Help-Container ist letzter Button -> KW direkt danach = rechts neben Help, links vom Profilbild
     const helpContainer = document.getElementById('O365_MainLink_Help_container');
-    const settingsContainer = document.getElementById('O365_MainLink_Settings_container');
-    const headerButtonRegion = document.getElementById('HeaderButtonRegion');
-
     if (helpContainer && helpContainer.parentNode) {
-      // Füge KW Badge nach dem Help-Button ein (direkt vor dem Profilbild)
-      const parent = helpContainer.parentNode;
-      const next = helpContainer.nextSibling;
-      if (next) {
-        parent.insertBefore(createKWBadge(), next);
-      } else {
-        parent.appendChild(createKWBadge());
-      }
+      // nextSibling nach Help = entweder nix oder Profilbild-Container
+      helpContainer.parentNode.insertBefore(createKWBadge(), helpContainer.nextSibling);
       return;
     }
 
-    if (settingsContainer && settingsContainer.parentNode) {
-      const parent = settingsContainer.parentNode;
-      parent.insertBefore(createKWBadge(), settingsContainer.nextSibling || settingsContainer);
-      return;
-    }
-
+    // Fallback: Direkt ans Ende von HeaderButtonRegion
+    const headerButtonRegion = document.getElementById('HeaderButtonRegion');
     if (headerButtonRegion) {
       headerButtonRegion.appendChild(createKWBadge());
-      return;
     }
-
-    // Letzter Fallback: ans Ende der NavBar
-    navHeader.appendChild(createKWBadge());
   }
 
   // ─── ROUTING ─────────────────────────────────────────────────────────────────
@@ -172,21 +145,30 @@
     if (spSpan) spSpan.textContent = `KW ${newKw}`;
   }, 3600000);
 
-  // ─── OBSERVER (SPA-Verhalten) ─────────────────────────────────────────────────
+  // ─── OBSERVER ────────────────────────────────────────────────────────────────
+  // Wichtig: disconnect nach erfolgreichem Inject um Performance zu schonen
+
+  let spInjected = false;
 
   const observer = new MutationObserver(() => {
-    injectKWButton();
+    const host = window.location.hostname;
+    if (host.includes('sharepoint.com')) {
+      if (spInjected && document.getElementById('kw-sharepoint-badge')) return;
+      injectKWButtonSharePoint();
+      if (document.getElementById('kw-sharepoint-badge')) {
+        spInjected = true;
+      }
+    } else {
+      injectKWButtonQuip();
+    }
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // ─── GESTAFFELTER START ───────────────────────────────────────────────────────
-  // Mehrere Versuche weil SharePoint den Header in Wellen lädt
-
+  // Gestaffelter Start
   injectKWButton();
   setTimeout(injectKWButton, 500);
   setTimeout(injectKWButton, 1500);
   setTimeout(injectKWButton, 3000);
-  setTimeout(injectKWButton, 6000);
 
 })();
