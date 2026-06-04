@@ -18,7 +18,6 @@
     if (document.getElementById('kw-quip-button')) return;
 
     const kw = getISOWeekNumber(new Date());
-
     const kwWrapper = document.createElement('div');
     kwWrapper.id = 'kw-quip-button';
     kwWrapper.style.display = 'inline-flex';
@@ -30,28 +29,17 @@
     kwButton.setAttribute('aria-label', `Kalenderwoche ${kw}`);
     kwButton.style.cssText = `
       background-color: rgb(var(--quipAction));
-      height: 32px;
-      padding-left: 12px;
-      padding-right: 12px;
-      color: rgb(255, 255, 255);
-      fill: rgb(255, 255, 255);
-      border: none;
-      border-radius: 4px;
+      height: 32px; padding-left: 12px; padding-right: 12px;
+      color: #fff; fill: #fff; border: none; border-radius: 4px;
       cursor: default;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 32px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-right: 4px;
-      user-select: none;
+      font-size: 14px; font-weight: 500; line-height: 32px;
+      display: flex; align-items: center; gap: 6px;
+      margin-right: 4px; user-select: none;
     `;
 
     const iconSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     iconSvg.setAttribute('viewBox', '0 0 24 24');
-    iconSvg.setAttribute('preserveAspectRatio', 'xMidYMid');
     iconSvg.setAttribute('width', '16');
     iconSvg.setAttribute('height', '16');
     iconSvg.style.fill = 'currentColor';
@@ -75,46 +63,37 @@
 
   // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
 
-  function injectKWButtonSharePoint() {
-    // Abbruch wenn bereits vorhanden
-    if (document.getElementById('kw-sharepoint-badge')) return;
-
-    // Profilbild-Element finden
-    const profilePic = document.getElementById('mectrl_headerPicture');
-    if (!profilePic) return;
-
+  function createKWBadge() {
     const kw = getISOWeekNumber(new Date());
-
-    // Badge erstellen
     const badge = document.createElement('div');
     badge.id = 'kw-sharepoint-badge';
     badge.setAttribute('aria-label', `Kalenderwoche ${kw}`);
     badge.title = `Kalenderwoche ${kw}`;
     badge.style.cssText = `
-      display: inline-flex;
-      align-items: center;
+      display: inline-flex !important;
+      align-items: center !important;
       gap: 5px;
       height: 32px;
       padding: 0 10px;
-      margin-right: 6px;
-      background-color: #0078d4;
+      margin-right: 8px;
+      background-color: rgba(255,255,255,0.15);
       color: #ffffff;
       font-family: "Segoe UI", -apple-system, sans-serif;
       font-size: 13px;
       font-weight: 600;
       border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.3);
       cursor: default;
       user-select: none;
       white-space: nowrap;
-      vertical-align: middle;
       flex-shrink: 0;
+      z-index: 9999;
     `;
 
-    // Kalender-Icon
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('width', '15');
-    svg.setAttribute('height', '15');
+    svg.setAttribute('width', '14');
+    svg.setAttribute('height', '14');
     svg.style.fill = 'currentColor';
     svg.style.flexShrink = '0';
     svg.innerHTML = `<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>`;
@@ -124,15 +103,50 @@
 
     badge.appendChild(svg);
     badge.appendChild(text);
+    return badge;
+  }
 
-    // Badge direkt vor dem Profilbild einfügen
-    // Das Profilbild sitzt im mectrl_currentAccount Container o.ä.
-    // Wir suchen den nächsten gemeinsamen Eltern-Container
-    const parent = profilePic.parentNode;
-    if (parent) {
-      parent.style.display = 'inline-flex';
-      parent.style.alignItems = 'center';
-      parent.insertBefore(badge, profilePic);
+  function injectKWButtonSharePoint() {
+    if (document.getElementById('kw-sharepoint-badge')) return;
+
+    // Strategie 1: direkt vor #mectrl_headerPicture
+    const profilePic = document.getElementById('mectrl_headerPicture');
+    if (profilePic) {
+      const parent = profilePic.closest('[id*="mectrl"]')?.parentNode
+                  || profilePic.parentNode;
+      if (parent) {
+        // Stelle sicher dass der Container flex ist
+        const computedDisplay = window.getComputedStyle(parent).display;
+        if (!computedDisplay.includes('flex')) {
+          parent.style.display = 'inline-flex';
+          parent.style.alignItems = 'center';
+        }
+        parent.insertBefore(createKWBadge(), profilePic.closest('[id*="mectrl"]') || profilePic);
+        return;
+      }
+    }
+
+    // Strategie 2: Vor dem letzten Element in #HeaderButtonRegion
+    const headerRegion = document.getElementById('HeaderButtonRegion');
+    if (headerRegion) {
+      // Finde den Settings-Container als Anker
+      const settingsContainer = document.getElementById('O365_MainLink_Settings_container')
+                             || document.getElementById('O365_MainLink_Help_container');
+      if (settingsContainer) {
+        headerRegion.insertBefore(createKWBadge(), settingsContainer);
+        return;
+      }
+      // Fallback: ans Ende von HeaderButtonRegion
+      headerRegion.appendChild(createKWBadge());
+      return;
+    }
+
+    // Strategie 3: Suche nach dem Suite-Nav-Bar
+    const suiteBar = document.querySelector('[data-automationid="SuiteHeader"]')
+                  || document.querySelector('#O365_HeaderLeftRegion')
+                  || document.querySelector('.o365cs-nav-header');
+    if (suiteBar) {
+      suiteBar.appendChild(createKWBadge());
     }
   }
 
@@ -151,12 +165,8 @@
 
   setInterval(() => {
     const newKw = getISOWeekNumber(new Date());
-
-    // Quip
     const quipSpan = document.querySelector('#kw-quip-button span');
     if (quipSpan) quipSpan.textContent = `KW ${newKw}`;
-
-    // SharePoint
     const spSpan = document.querySelector('#kw-sharepoint-badge span');
     if (spSpan) spSpan.textContent = `KW ${newKw}`;
   }, 3600000);
@@ -167,13 +177,14 @@
     injectKWButton();
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
-  // ─── INITIALER AUFRUF ────────────────────────────────────────────────────────
+  // ─── INITIALER AUFRUF MIT VERZÖGERUNG ────────────────────────────────────────
+  // SharePoint lädt die Header-Elemente verzögert nach
 
   injectKWButton();
+  setTimeout(injectKWButton, 1000);
+  setTimeout(injectKWButton, 3000);
+  setTimeout(injectKWButton, 6000);
 
 })();
