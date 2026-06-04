@@ -61,32 +61,45 @@
     }
   }
 
-  // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
+  // ─── SHAREPOINT & OFFICE ONLINE: Badge erstellen ─────────────────────────────
 
-  function createKWBadge() {
+  function createKWBadge(id) {
     const kw = getISOWeekNumber(new Date());
     const badge = document.createElement('div');
-    badge.id = 'kw-sharepoint-badge';
+    badge.id = id || 'kw-sharepoint-badge';
     badge.setAttribute('aria-label', `Kalenderwoche ${kw}`);
     badge.title = `Kalenderwoche ${kw}`;
+
+    // Exakt wie die anderen o365sx-button Container aufgebaut
     badge.style.cssText = `
       display: inline-flex !important;
       align-items: center !important;
-      gap: 5px;
-      height: 32px;
-      padding: 0 10px;
-      margin-right: 4px;
-      background-color: rgba(255,255,255,0.15);
+      justify-content: center;
+      gap: 4px;
+      height: 48px;
+      padding: 0 8px;
       color: #ffffff;
       font-family: "Segoe UI", -apple-system, sans-serif;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.3);
       cursor: default;
       user-select: none;
       white-space: nowrap;
       flex-shrink: 0;
+      vertical-align: middle;
+      box-sizing: border-box;
+    `;
+
+    const inner = document.createElement('div');
+    inner.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      height: 32px;
+      padding: 0 8px;
+      background-color: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 4px;
     `;
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -100,27 +113,60 @@
     const text = document.createElement('span');
     text.textContent = `KW ${kw}`;
 
-    badge.appendChild(svg);
-    badge.appendChild(text);
+    inner.appendChild(svg);
+    inner.appendChild(text);
+    badge.appendChild(inner);
     return badge;
   }
+
+  // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
 
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // #HeaderButtonRegion ist der stabile Container mit allen Buttons
-    // Help-Container ist letzter Button -> KW direkt danach = rechts neben Help, links vom Profilbild
+    // Nach Help-Button einfügen (letzter Button vor Profilbild in HeaderButtonRegion)
     const helpContainer = document.getElementById('O365_MainLink_Help_container');
     if (helpContainer && helpContainer.parentNode) {
-      // nextSibling nach Help = entweder nix oder Profilbild-Container
-      helpContainer.parentNode.insertBefore(createKWBadge(), helpContainer.nextSibling);
+      helpContainer.parentNode.insertBefore(
+        createKWBadge('kw-sharepoint-badge'),
+        helpContainer.nextSibling
+      );
       return;
     }
 
-    // Fallback: Direkt ans Ende von HeaderButtonRegion
     const headerButtonRegion = document.getElementById('HeaderButtonRegion');
     if (headerButtonRegion) {
-      headerButtonRegion.appendChild(createKWBadge());
+      headerButtonRegion.appendChild(createKWBadge('kw-sharepoint-badge'));
+    }
+  }
+
+  // ─── OFFICE ONLINE (Excel, Word, PowerPoint) ──────────────────────────────────
+
+  function injectKWButtonOffice() {
+    if (document.getElementById('kw-office-badge')) return;
+
+    // In Excel/Word Online ist der Settings-Button in #SettingsIcon_container
+    // innerhalb von #CustomRightRegion
+    const settingsContainer = document.getElementById('SettingsIcon_container');
+    if (settingsContainer && settingsContainer.parentNode) {
+      settingsContainer.parentNode.insertBefore(
+        createKWBadge('kw-office-badge'),
+        settingsContainer
+      );
+      return;
+    }
+
+    // Fallback: vor dem Me-Button in O365_HeaderRightRegion
+    const rightRegion = document.getElementById('O365_HeaderRightRegion');
+    if (rightRegion) {
+      rightRegion.insertBefore(createKWBadge('kw-office-badge'), rightRegion.firstChild);
+      return;
+    }
+
+    // Letzter Fallback: ans Ende der CustomRightRegion
+    const customRight = document.getElementById('CustomRightRegion');
+    if (customRight) {
+      customRight.appendChild(createKWBadge('kw-office-badge'));
     }
   }
 
@@ -128,10 +174,15 @@
 
   function injectKWButton() {
     const host = window.location.hostname;
-    if (host.includes('sharepoint.com')) {
-      injectKWButtonSharePoint();
-    } else {
+    if (host.includes('quip.com')) {
       injectKWButtonQuip();
+    } else if (
+      host.includes('officeapps.live.com') ||
+      host.includes('cloud.microsoft')
+    ) {
+      injectKWButtonOffice();
+    } else if (host.includes('sharepoint.com')) {
+      injectKWButtonSharePoint();
     }
   }
 
@@ -139,28 +190,35 @@
 
   setInterval(() => {
     const newKw = getISOWeekNumber(new Date());
-    const quipSpan = document.querySelector('#kw-quip-button span');
-    if (quipSpan) quipSpan.textContent = `KW ${newKw}`;
-    const spSpan = document.querySelector('#kw-sharepoint-badge span');
-    if (spSpan) spSpan.textContent = `KW ${newKw}`;
+    ['#kw-quip-button span', '#kw-sharepoint-badge span', '#kw-office-badge span'].forEach(sel => {
+      const el = document.querySelector(sel);
+      if (el) el.textContent = `KW ${newKw}`;
+    });
   }, 3600000);
 
   // ─── OBSERVER ────────────────────────────────────────────────────────────────
-  // Wichtig: disconnect nach erfolgreichem Inject um Performance zu schonen
 
-  let spInjected = false;
+  let injected = false;
 
   const observer = new MutationObserver(() => {
-    const host = window.location.hostname;
-    if (host.includes('sharepoint.com')) {
-      if (spInjected && document.getElementById('kw-sharepoint-badge')) return;
-      injectKWButtonSharePoint();
-      if (document.getElementById('kw-sharepoint-badge')) {
-        spInjected = true;
+    if (injected) {
+      // Nur prüfen ob Badge verschwunden ist (z.B. bei SPA-Navigation)
+      const host = window.location.hostname;
+      const badgeId = host.includes('quip.com') ? 'kw-quip-button'
+                    : host.includes('cloud.microsoft') || host.includes('officeapps.live.com') ? 'kw-office-badge'
+                    : 'kw-sharepoint-badge';
+      if (!document.getElementById(badgeId)) {
+        injected = false;
+      } else {
+        return;
       }
-    } else {
-      injectKWButtonQuip();
     }
+    injectKWButton();
+    const host = window.location.hostname;
+    const badgeId = host.includes('quip.com') ? 'kw-quip-button'
+                  : host.includes('cloud.microsoft') || host.includes('officeapps.live.com') ? 'kw-office-badge'
+                  : 'kw-sharepoint-badge';
+    if (document.getElementById(badgeId)) injected = true;
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
