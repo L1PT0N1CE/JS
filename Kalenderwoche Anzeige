@@ -1,17 +1,3 @@
-// ==UserScript==
-// @name         KW Button (Quip + SharePoint + Office Online)
-// @namespace    http://tampermonkey.net/
-// @version      2.4
-// @description  Zeigt die aktuelle Kalenderwoche in Quip, SharePoint und Office Online an
-// @match        https://quip.com/*
-// @match        https://amazondeu.sharepoint.com/*
-// @match        https://*.officeapps.live.com/*
-// @match        https://excel.cloud.microsoft/*
-// @match        https://word.cloud.microsoft/*
-// @match        https://powerpoint.cloud.microsoft/*
-// @grant        none
-// ==/UserScript==
-
 (function () {
   'use strict';
 
@@ -75,74 +61,129 @@
     }
   }
 
-  // ─── SHAREPOINT & OFFICE ONLINE: Badge erstellen ─────────────────────────────
+  // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
 
-  function createKWBadge(id) {
+  function createKWBadge() {
     const kw = getISOWeekNumber(new Date());
-    const badge = document.createElement('div');
-    badge.id = id || 'kw-sharepoint-badge';
-    badge.setAttribute('aria-label', `Kalenderwoche ${kw}`);
-    badge.title = `Kalenderwoche ${kw}`;
 
-    // Exakt wie die anderen o365sx-button Container aufgebaut
-    badge.style.cssText = `
-      display: inline-flex !important;
-      align-items: center !important;
+    // Exakt gleiche Struktur wie #O365_MainLink_Help_container:
+    // <div class="M3pc...">         ← Container (gleiche Klasse)
+    //   <div class="rSDn...">       ← Wrapper
+    //     <button class="clgi... o365sx-button">   ← Button
+    //       <div class="o365cs-base">
+    //         [icon + text]
+    //       </div>
+    //     </button>
+    //   </div>
+    // </div>
+
+    // Äußerer Container - gleiche Klasse wie die anderen _container divs
+    const container = document.createElement('div');
+    container.id = 'kw-sharepoint-badge';
+    // Klasse vom Help-Container kopieren für identisches Layout
+    const helpContainer = document.getElementById('O365_MainLink_Help_container');
+    if (helpContainer) {
+      container.className = helpContainer.className;
+    }
+
+    // Mittlerer Wrapper
+    const wrapper = document.createElement('div');
+    const helpWrapper = helpContainer
+      ? helpContainer.querySelector('div')
+      : null;
+    if (helpWrapper) {
+      wrapper.className = helpWrapper.className;
+    }
+
+    // Button - gleiche Klassen wie o365sx-button
+    const btn = document.createElement('div'); // div statt button, damit kein Klick-Effekt
+    btn.setAttribute('role', 'presentation');
+    btn.setAttribute('aria-label', `Kalenderwoche ${kw}`);
+    btn.setAttribute('title', `Kalenderwoche ${kw}`);
+
+    // Gleiche Klassen wie der Help-Button, aber als div
+    const helpBtn = helpContainer
+      ? helpContainer.querySelector('button')
+      : null;
+    if (helpBtn) {
+      btn.className = helpBtn.className;
+    } else {
+      btn.className = 'clgiLVKPzugZZns0LiPTqw== o365sx-button';
+    }
+
+    btn.style.cssText = `
+      cursor: default !important;
+      display: block;
+      position: relative;
+      margin: 0;
+      padding: 0;
+      min-width: 48px;
+      text-align: center;
+      background: transparent;
+      border: none;
+      width: auto;
+      height: 100%;
+      box-sizing: border-box;
+      line-height: 48px;
+      overflow: hidden;
+      color: inherit;
+    `;
+
+    // Innerer o365cs-base div
+    const base = document.createElement('div');
+    base.className = 'o365cs-base';
+    base.setAttribute('aria-hidden', 'true');
+    base.style.cssText = `
+      height: 100%;
+      display: flex;
+      align-items: center;
       justify-content: center;
       gap: 4px;
-      height: 70px;
-      padding: 0 8px;
-      color: #ffffff;
-      font-family: "Segoe UI", -apple-system, sans-serif;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: default;
-      user-select: none;
-      white-space: nowrap;
-      flex-shrink: 0;
-      vertical-align: middle;
-      box-sizing: border-box;
+      padding: 0 6px;
+      color: inherit;
     `;
 
-    const inner = document.createElement('div');
-    inner.style.cssText = `
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      height: 32px;
-      padding: 0 8px;
-      background-color: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.35);
-      border-radius: 4px;
-    `;
-
+    // Kalender-Icon (gleiche Größe wie ms-Icon: 16px)
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('width', '14');
-    svg.setAttribute('height', '14');
-    svg.style.fill = 'currentColor';
-    svg.style.flexShrink = '0';
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = `
+      fill: currentColor;
+      flex-shrink: 0;
+      display: inline-block;
+    `;
     svg.innerHTML = `<path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/>`;
 
+    // Text
     const text = document.createElement('span');
+    text.style.cssText = `
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 48px;
+      white-space: nowrap;
+      color: inherit;
+    `;
     text.textContent = `KW ${kw}`;
 
-    inner.appendChild(svg);
-    inner.appendChild(text);
-    badge.appendChild(inner);
-    return badge;
-  }
+    base.appendChild(svg);
+    base.appendChild(text);
+    btn.appendChild(base);
+    wrapper.appendChild(btn);
+    container.appendChild(wrapper);
 
-  // ─── SHAREPOINT ──────────────────────────────────────────────────────────────
+    return container;
+  }
 
   function injectKWButtonSharePoint() {
     if (document.getElementById('kw-sharepoint-badge')) return;
 
-    // Nach Help-Button einfügen (letzter Button vor Profilbild in HeaderButtonRegion)
     const helpContainer = document.getElementById('O365_MainLink_Help_container');
     if (helpContainer && helpContainer.parentNode) {
       helpContainer.parentNode.insertBefore(
-        createKWBadge('kw-sharepoint-badge'),
+        createKWBadge(),
         helpContainer.nextSibling
       );
       return;
@@ -150,37 +191,7 @@
 
     const headerButtonRegion = document.getElementById('HeaderButtonRegion');
     if (headerButtonRegion) {
-      headerButtonRegion.appendChild(createKWBadge('kw-sharepoint-badge'));
-    }
-  }
-
-  // ─── OFFICE ONLINE (Excel, Word, PowerPoint) ──────────────────────────────────
-
-  function injectKWButtonOffice() {
-    if (document.getElementById('kw-office-badge')) return;
-
-    // In Excel/Word Online ist der Settings-Button in #SettingsIcon_container
-    // innerhalb von #CustomRightRegion
-    const settingsContainer = document.getElementById('SettingsIcon_container');
-    if (settingsContainer && settingsContainer.parentNode) {
-      settingsContainer.parentNode.insertBefore(
-        createKWBadge('kw-office-badge'),
-        settingsContainer
-      );
-      return;
-    }
-
-    // Fallback: vor dem Me-Button in O365_HeaderRightRegion
-    const rightRegion = document.getElementById('O365_HeaderRightRegion');
-    if (rightRegion) {
-      rightRegion.insertBefore(createKWBadge('kw-office-badge'), rightRegion.firstChild);
-      return;
-    }
-
-    // Letzter Fallback: ans Ende der CustomRightRegion
-    const customRight = document.getElementById('CustomRightRegion');
-    if (customRight) {
-      customRight.appendChild(createKWBadge('kw-office-badge'));
+      headerButtonRegion.appendChild(createKWBadge());
     }
   }
 
@@ -190,24 +201,19 @@
     const host = window.location.hostname;
     if (host.includes('quip.com')) {
       injectKWButtonQuip();
-    } else if (
-      host.includes('officeapps.live.com') ||
-      host.includes('cloud.microsoft')
-    ) {
-      injectKWButtonOffice();
     } else if (host.includes('sharepoint.com')) {
       injectKWButtonSharePoint();
     }
   }
 
-  // ─── KW AKTUALISIERUNG (stündlich) ───────────────────────────────────────────
+  // ─── KW AKTUALISIERUNG ───────────────────────────────────────────────────────
 
   setInterval(() => {
     const newKw = getISOWeekNumber(new Date());
-    ['#kw-quip-button span', '#kw-sharepoint-badge span', '#kw-office-badge span'].forEach(sel => {
-      const el = document.querySelector(sel);
-      if (el) el.textContent = `KW ${newKw}`;
-    });
+    const quipSpan = document.querySelector('#kw-quip-button span');
+    if (quipSpan) quipSpan.textContent = `KW ${newKw}`;
+    const spText = document.querySelector('#kw-sharepoint-badge span');
+    if (spText) spText.textContent = `KW ${newKw}`;
   }, 3600000);
 
   // ─── OBSERVER ────────────────────────────────────────────────────────────────
@@ -215,29 +221,18 @@
   let injected = false;
 
   const observer = new MutationObserver(() => {
-    if (injected) {
-      // Nur prüfen ob Badge verschwunden ist (z.B. bei SPA-Navigation)
-      const host = window.location.hostname;
-      const badgeId = host.includes('quip.com') ? 'kw-quip-button'
-                    : host.includes('cloud.microsoft') || host.includes('officeapps.live.com') ? 'kw-office-badge'
-                    : 'kw-sharepoint-badge';
-      if (!document.getElementById(badgeId)) {
-        injected = false;
-      } else {
-        return;
-      }
-    }
+    if (injected && document.getElementById(
+      window.location.hostname.includes('quip.com') ? 'kw-quip-button' : 'kw-sharepoint-badge'
+    )) return;
+    injected = false;
     injectKWButton();
-    const host = window.location.hostname;
-    const badgeId = host.includes('quip.com') ? 'kw-quip-button'
-                  : host.includes('cloud.microsoft') || host.includes('officeapps.live.com') ? 'kw-office-badge'
-                  : 'kw-sharepoint-badge';
-    if (document.getElementById(badgeId)) injected = true;
+    injected = !!document.getElementById(
+      window.location.hostname.includes('quip.com') ? 'kw-quip-button' : 'kw-sharepoint-badge'
+    );
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Gestaffelter Start
   injectKWButton();
   setTimeout(injectKWButton, 500);
   setTimeout(injectKWButton, 1500);
