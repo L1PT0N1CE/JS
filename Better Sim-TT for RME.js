@@ -1,18 +1,3 @@
-// ==UserScript==
-// @name          Better Sim-TT for RME
-// @namespace     https://phonetool.amazon.com/users/kanataza
-// @version       2.3
-// @description   Combines Auto Refresher, Copy TT Link, WO Number & Open WO Link, and Correspondence Alt+3 Alt+4
-// @author        kanataza
-// @match         https://t.corp.amazon.com/*
-// @icon          https://media.licdn.com/dms/image/v2/D4E03AQEkSQG-ayth3g/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1730057709648?e=2147483647&v=beta&t=C7VGPq9vEfeuAcJa6aO7eBLN8GDKcR5c70l1ABnA3DU
-// @require       https://code.jquery.com/jquery-3.6.0.min.js
-// @grant         GM_setValue
-// @grant         GM_getValue
-// @grant         GM_setClipboard
-// @grant         GM_addStyle
-// ==/UserScript==
-
 (function () {
   'use strict';
 
