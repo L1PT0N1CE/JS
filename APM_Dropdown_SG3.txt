@@ -13802,10 +13802,11 @@
     if (element.getAttribute("name") === "equipment" && element.value === "REMEDY.FACILITIES") {
       element.value = "";
     }
+
     const input = element.value;
     const filteredTexts = filterTexts(input, list);
-    const name = element.getAttribute("name");
-    const datalistId = "autocomplete-" + name;
+
+    const datalistId = "autocomplete-suggestions";
     let dropdown = document.getElementById(datalistId);
     if (!dropdown) {
       dropdown = document.createElement("datalist");
@@ -13813,54 +13814,24 @@
       document.body.appendChild(dropdown);
     }
     dropdown.innerHTML = '';
-    for (const text of filteredTexts.slice(0, 50)) {
+
+    for (const text of filteredTexts) {
       const option = document.createElement("option");
       option.value = text;
       dropdown.appendChild(option);
     }
-    if (element.getAttribute("list") !== datalistId) {
+
+    if (!element.getAttribute("list")) {
       element.setAttribute("list", datalistId);
     }
   }
 
-  function handleAutofill(event) {
+  document.addEventListener("focusin", function (event) {
     const element = event.target;
-    if (!element || element.tagName !== "INPUT") return;
     const name = element.getAttribute("name");
     if (name && config[name]) {
       autofill(element, config[name]);
     }
-  }
-
-  function attachToInput(element) {
-    if (!element || element.tagName !== "INPUT") return;
-    const name = element.getAttribute("name");
-    if (!name || !config[name]) return;
-    if (element.dataset.autocompleteAttached) return;
-    element.dataset.autocompleteAttached = "true";
-    element.addEventListener("focus", () => autofill(element, config[name]));
-    element.addEventListener("input", () => autofill(element, config[name]));
-    element.addEventListener("click", () => {
-      setTimeout(() => autofill(element, config[name]), 100);
-    });
-    autofill(element, config[name]);
-  }
-
-  document.querySelectorAll("input").forEach(attachToInput);
-
-  const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-      mutation.addedNodes.forEach(function(node) {
-        if (node.nodeType !== 1) return;
-        if (node.tagName === "INPUT") attachToInput(node);
-        node.querySelectorAll && node.querySelectorAll("input").forEach(attachToInput);
-      });
-    });
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
   });
 
 })();
