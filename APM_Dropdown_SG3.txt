@@ -13806,31 +13806,49 @@
     const input = element.value;
     const filteredTexts = filterTexts(input, list);
 
-    const datalistId = "autocomplete-suggestions";
+    const name = element.getAttribute("name");
+    const datalistId = "autocomplete-" + name;
+    
     let dropdown = document.getElementById(datalistId);
     if (!dropdown) {
       dropdown = document.createElement("datalist");
       dropdown.id = datalistId;
       document.body.appendChild(dropdown);
     }
+    
     dropdown.innerHTML = '';
 
-    for (const text of filteredTexts) {
+    for (const text of filteredTexts.slice(0, 50)) {
       const option = document.createElement("option");
       option.value = text;
       dropdown.appendChild(option);
     }
 
-    if (!element.getAttribute("list")) {
+    if (element.getAttribute("list") !== datalistId) {
       element.setAttribute("list", datalistId);
     }
   }
 
-  document.addEventListener("focusin", function (event) {
+  function handleAutofill(event) {
     const element = event.target;
+    if (!element || element.tagName !== "INPUT") return;
+    
     const name = element.getAttribute("name");
     if (name && config[name]) {
       autofill(element, config[name]);
+    }
+  }
+
+  document.addEventListener("focusin", handleAutofill);
+  document.addEventListener("focus", handleAutofill, true);
+  document.addEventListener("input", handleAutofill);
+  
+  document.addEventListener("click", function(event) {
+    const element = event.target;
+    if (!element || element.tagName !== "INPUT") return;
+    const name = element.getAttribute("name");
+    if (name && config[name]) {
+      setTimeout(() => autofill(element, config[name]), 50);
     }
   });
 
