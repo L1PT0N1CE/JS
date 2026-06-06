@@ -13794,10 +13794,38 @@
     ]
   };
 
+  function filterTexts(input, list) {
+    return list.filter(text => text.toLowerCase().includes(input.toLowerCase()));
+  }
+
+  function autofill(element, list) {
+    if (element.getAttribute("name") === "equipment" && element.value === "REMEDY.FACILITIES") {
+      element.value = "";
+    }
+    const input = element.value;
+    const filteredTexts = filterTexts(input, list);
+    const name = element.getAttribute("name");
+    const datalistId = "autocomplete-" + name;
+    let dropdown = document.getElementById(datalistId);
+    if (!dropdown) {
+      dropdown = document.createElement("datalist");
+      dropdown.id = datalistId;
+      document.body.appendChild(dropdown);
+    }
+    dropdown.innerHTML = '';
+    for (const text of filteredTexts.slice(0, 50)) {
+      const option = document.createElement("option");
+      option.value = text;
+      dropdown.appendChild(option);
+    }
+    if (element.getAttribute("list") !== datalistId) {
+      element.setAttribute("list", datalistId);
+    }
+  }
+
   function handleAutofill(event) {
     const element = event.target;
     if (!element || element.tagName !== "INPUT") return;
-    
     const name = element.getAttribute("name");
     if (name && config[name]) {
       autofill(element, config[name]);
@@ -13808,36 +13836,23 @@
     if (!element || element.tagName !== "INPUT") return;
     const name = element.getAttribute("name");
     if (!name || !config[name]) return;
-    
-    // Verhindert doppeltes Anhängen
     if (element.dataset.autocompleteAttached) return;
     element.dataset.autocompleteAttached = "true";
-    
     element.addEventListener("focus", () => autofill(element, config[name]));
     element.addEventListener("input", () => autofill(element, config[name]));
     element.addEventListener("click", () => {
       setTimeout(() => autofill(element, config[name]), 100);
     });
-    
-    // Sofort beim Anhängen befüllen
     autofill(element, config[name]);
   }
 
-  // Alle bereits vorhandenen Inputs
   document.querySelectorAll("input").forEach(attachToInput);
 
-  // Auf neue dynamisch erstellte Inputs warten
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       mutation.addedNodes.forEach(function(node) {
-        if (node.nodeType !== 1) return; // nur HTML Elemente
-        
-        // Ist das Node selbst ein Input?
-        if (node.tagName === "INPUT") {
-          attachToInput(node);
-        }
-        
-        // Inputs innerhalb des neuen Nodes suchen
+        if (node.nodeType !== 1) return;
+        if (node.tagName === "INPUT") attachToInput(node);
         node.querySelectorAll && node.querySelectorAll("input").forEach(attachToInput);
       });
     });
