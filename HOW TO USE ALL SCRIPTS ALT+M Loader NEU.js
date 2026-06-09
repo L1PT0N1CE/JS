@@ -48,7 +48,7 @@
         <p>ALT+1 = Füllt LINKE Checkliste aus</p>
         <p>ALT+2 = Füllt RECHTE Checkliste aus</p>
         <p>ALT+X = Entfernt die komplette Checkliste</p>
-        <p>ALT+3 = Füllt Workorder aus. VORSICHT BEI PROBLEMCODES</p>
+        <p>ALT+3 = Füllt Workorder aus. (Manchmal 2x drücken) >>>VORSICHT BEI PROBLEMCODES</p>
         <p>ALT+4 = Öffnet ein Fenster zum Zeiten buchen EDITIERBAR</p>
         <p>ALT+5 = 2x drücken assigned mit rechtsklick angewählte WO an dich</p>
         <p>ALT+6 = 2x drücken schließt die mit rechtsklcik angewählte WO</p>
