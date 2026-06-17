@@ -1,4 +1,65 @@
 (function () {
+  'use strict';
+
+  // ===== LOGIN-KONFIGURATION =====
+
+  // Logins aus dem Speicher laden (oder null wenn noch nie konfiguriert)
+  let savedLogins = GM_getValue("ff_assignedto_logins", null);
+
+  // Beim ersten Mal: Abfrage starten
+  if (savedLogins === null) {
+    const input = prompt(
+      "⚙️ Erste Einrichtung: Bitte gib die Logins deiner Schichtgruppe ein.\n\n" +
+      "Trenne die Logins mit Komma (,).\n\n" +
+      "Beispiel: KANATAZA, IVELIK, HSSHIMEN, RMALOGOR",
+      ""
+    );
+
+    if (input && input.trim() !== "") {
+      // Logins bereinigen und als Array speichern
+      savedLogins = input.split(",").map(login => login.trim().toUpperCase()).filter(l => l !== "");
+      GM_setValue("ff_assignedto_logins", JSON.stringify(savedLogins));
+    } else {
+      // Fallback: leeres Array wenn nichts eingegeben wird
+      savedLogins = [];
+      GM_setValue("ff_assignedto_logins", JSON.stringify(savedLogins));
+    }
+  } else {
+    // Gespeicherte Logins laden
+    savedLogins = JSON.parse(savedLogins);
+  }
+
+  // ===== MENÜ-BEFEHLE ZUM NACHTRÄGLICHEN BEARBEITEN =====
+
+  // Logins bearbeiten (über Tampermonkey-Menü erreichbar)
+  GM_registerMenuCommand("✏️ Logins bearbeiten", function () {
+    const currentLogins = GM_getValue("ff_assignedto_logins", "[]");
+    const parsed = JSON.parse(currentLogins);
+
+    const input = prompt(
+      "Aktuelle Logins bearbeiten:\n(mit Komma getrennt)",
+      parsed.join(", ")
+    );
+
+    if (input !== null) {
+      const newLogins = input.split(",").map(login => login.trim().toUpperCase()).filter(l => l !== "");
+      GM_setValue("ff_assignedto_logins", JSON.stringify(newLogins));
+      alert("✅ Logins gespeichert! Seite wird neu geladen.");
+      location.reload();
+    }
+  });
+
+  // Logins zurücksetzen (löst beim nächsten Laden die Ersteinrichtung erneut aus)
+  GM_registerMenuCommand("🔄 Logins zurücksetzen", function () {
+    if (confirm("Alle gespeicherten Logins löschen?\nBeim nächsten Laden wird die Einrichtung erneut angezeigt.")) {
+      GM_setValue("ff_assignedto_logins", null);
+      alert("Logins gelöscht. Seite wird neu geladen.");
+      location.reload();
+    }
+  });
+
+  // ===== REST DES SCRIPTS =====
+
   const equipment_list = [
 "AR.ZONE.2.FSS.MSC",
 "AR.ZONE.2.FSS.PSC.2103",
@@ -12003,30 +12064,15 @@
       "Remedy Request"
     ],
 
-    ff_assignedto: [
-      "KANATAZA",
-      "IVELIK",
-      "HSSHIMEN",
-      "RMALOGOR",
-      "USSAXEL",
-      "KLIKEVI",
-      "JSONSTA",
-      "LUGEJASO",
-      "KEDAMA",
-      "SCHMIDQD",
-      "IONELVIC",
-      "SHALSAMI",
-      "SCHUDACK",
-      "DALDALCI",
-      "FLOOO",
-      "SPRINOLI"
-    ],
+    ff_assignedto: savedLogins,
+
     ff_shift: [
       "FA73",
       "FA71",
       "FA72",
       "FA74"
     ],
+
     wspf_10_com_descript: [
       "Safety Tip",
       "Success Story",
