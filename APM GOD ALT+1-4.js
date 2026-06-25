@@ -268,7 +268,8 @@
         {
             const EXT        = (typeof Ext !== 'undefined') ? Ext : window.Ext;
             const statusComp = EXT?.ComponentQuery?.query('[name="workorderstatus"]')[0];
-            const hasIP      = (statusComp?.store?.data?.items || []).some(r =>
+            const statusItems = statusComp?.store?.data?.items || [];
+            const hasIP       = statusItems.some(r =>
                 r.data?.code === 'IP' || r.data?.value === 'IP'
             );
             if (hasIP) {
