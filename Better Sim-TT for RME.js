@@ -504,48 +504,165 @@
     }
 
     function getResponseTextFromTitle(title) {
-        title = title.toLowerCase();
+        const t = title.toLowerCase();
 
-        if (/\bracklight\b|\bracklights\b|\brack lights\b|\branklights\b|\brack\b/.test(title))
-            return 'We restarted the Racklight/Rack. The Station is operational again.\nBest regards.';
-        if (/\blifter\b/.test(title))
-            return 'We restarted the lifter. The Station is operational again.\nBest regards.';
-        if (/\baether\b|\bno comms\b/.test(title))
-            return 'Aether on Floor2 is still not Activ in FRA7 yet because of Missing KNX Connection.\nBest regards.';
-        if (/\bdestacker\b|\bdestucker\b|\bdesticker\b|\bdestaker\b|\bdastaker\b|\bdestecker\b|\bdesteker\b|\bdasticker\b/.test(title))
-            return 'We restarted the Stacker. The Station is operational again.\nBest regards.';
-        if (/\bfiducial\b/.test(title))
+        // ── DESTACKER (1279x + Typos) ──────────────────────────────────────
+        if (/destacker|destecker|destucker|destauker|destaker|dastaker|dasticker|desteker|descaker|destaucker|distek|distak|disteck|stacker/.test(t))
+            return 'We restarted the Destacker. The Station is operational again.\nBest regards.';
+
+        // ── DRIVE (822x) ───────────────────────────────────────────────────
+        if (/\bdrive\b|\bdu\b/.test(t)) {
+            if (/charger|faulted/.test(t))
+                return 'We removed the Drive from the Charger and reset it. The Drive is operational again.\nBest regards.';
+            if (/out of service|wont go in service|not going in service/.test(t))
+                return 'We put the Drive back in service. The Drive is operational again.\nBest regards.';
+            if (/stuck|item|obstruction|klemmt/.test(t))
+                return 'We removed the obstruction from the Drive. The Drive is operational again.\nBest regards.';
+            if (/wlan|wifi|connect|verbindung/.test(t))
+                return 'We fixed the WLAN connection of the Drive. The Drive is operational again.\nBest regards.';
+            return 'We fixed the Drive. The Drive is operational again.\nBest regards.';
+        }
+
+        // ── FIDUCIAL (616x) ────────────────────────────────────────────────
+        if (/fiducial|fiducal/.test(t))
             return 'We replaced the Fiducial. The Floor is operational again.\nBest regards.';
-        if (/\bids\b/.test(title))
-            return 'We restarted the IDS. The Station is operational again.\nBest regards.';
-        if (/\boutbound\b|\bconvey(or|er)\b|\bhigh control\b/.test(title))
-            return 'We removed the Jam. The Conveyor is operational again.\nBest regards.';
-        if (/\bpod\b|\bbin\b|\bdirty\b|\bbinreinigung\b/.test(title))
-            return 'We cleaned the POD. The POD is operational again.\nBest regards.';
-        if (/\bbildschirm\b|\bscreen\b|\baufgehängt\b|\bsystemerror\b|\bsystem error\b|\bsystemfehler\b|\brestart\b|\bfaulted station\b|\beingefroren\b|\bfrozen\b|\bneugestartet\b|\bstation is faulted\b|\bstation hängt\b|\bneustart\b|\breboot\b|\babmelden\b|\banmelden\b|\bverbindung\b|\bmonitor\b|\bcomputer\b|\breset\b/.test(title))
-            return 'We restarted the System. The Station is operational again.\nBest regards.';
-        if (/\bcognex\b/.test(title))
-            return 'We fixed the Scanner. The Station is operational again.\nBest regards.';
-        if (/\bcharger\b/.test(title))
-            return 'We fixed the Charger. The Charger is operational again.\nBest regards.';
-        if (/\bliquid\b|\bausgelaufen\b|\bspill\b/.test(title))
-            return 'We cleaned the Area/Floor. The Area/Floor is operational again.\nBest regards.';
-        if (/\bfido\b|\balarm\b/.test(title))
-            return 'We fixed the Fido. The Station is operational again.\nBest regards.';
-        if (/\bestop\b|\be-stop\b|\bfloor stopped\b/.test(title))
-            return 'We removed the E-Stop. The Floor is operational again.\nBest regards.';
-        if (/\blow confidence\b/.test(title))
-            return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
-        if (/\bbeamer\b|\bmagenta\b|\bprojector\b/.test(title))
-            return 'We fixed the Projector. The Station is operational again.\nBest regards.';
-        if (/\bdepal\b/.test(title))
-            return 'We fixed the Jam/Crash on the Depal. The Depaletizer is operational again.\nBest regards.';
-        if (/\bladder\b/.test(title))
-            return 'We fixed Ladder. The Ladder is operational again.\nBest regards.';
-        if (/\bdrive\b|\bdu\b/.test(title))
-            return 'We fixed the Drive. The Drive operational again.\nBest regards.';
 
-        return 'The Station, Drive, Charger, Floor, Pod, Conveyance, Area, is operational again.\nBest regards.';
+        // ── POD / BIN / DIRTY (604x) ───────────────────────────────────────
+        if (/\bpod\b/.test(t)) {
+            if (/dirty|clean|reinigung|binclean/.test(t))
+                return 'We cleaned the POD/Bin. The POD is operational again.\nBest regards.';
+            if (/hook|tilted|kippe/.test(t))
+                return 'We fixed the POD hook. The POD is operational again.\nBest regards.';
+            return 'We fixed the POD. The POD is operational again.\nBest regards.';
+        }
+        if (/dirty|bin reinigung|binreinigung|binclean/.test(t))
+            return 'We cleaned the POD/Bin. The POD is operational again.\nBest regards.';
+
+        // ── SCREEN / FROZEN / DISPLAY / BILDSCHIRM (575x) ─────────────────
+        if (/screen|frozen|froze|freeze|bildschirm|display|white screen|black screen|eingefroren|eingefrohren/.test(t))
+            return 'We restarted the Station. The Station is operational again.\nBest regards.';
+
+        // ── LIFTER / ELEVATOR (475x) ───────────────────────────────────────
+        if (/lifter|elevator/.test(t)) {
+            if (/stuck|klemmt|blocked|middle/.test(t))
+                return 'We fixed the stuck Lifter/Elevator. The Station is operational again.\nBest regards.';
+            if (/calibrat|adjust|level/.test(t))
+                return 'We calibrated the Lifter. The Station is operational again.\nBest regards.';
+            return 'We restarted the Lifter/Elevator. The Station is operational again.\nBest regards.';
+        }
+
+        // ── FIDO (413x) ────────────────────────────────────────────────────
+        if (/\bfido\b/.test(t))
+            return 'We checked and reset the FIDO safety system. The Station is operational again.\nBest regards.';
+
+        // ── IDS (214x) ─────────────────────────────────────────────────────
+        if (/\bids\b/.test(t)) {
+            if (/connection|lost|verbindung/.test(t))
+                return 'We restored the IDS connection. The Station is operational again.\nBest regards.';
+            return 'We restarted the IDS. The Station is operational again.\nBest regards.';
+        }
+
+        // ── ROLLER / ROLLE (281x) ──────────────────────────────────────────
+        if (/\brolle\b|\broller\b|\brollen\b/.test(t)) {
+            if (/fehlt|missing/.test(t))
+                return 'We replaced the missing Roller. The Station is operational again.\nBest regards.';
+            if (/defekt|broken|defect/.test(t))
+                return 'We replaced the defective Roller. The Station is operational again.\nBest regards.';
+            return 'We fixed the Roller. The Station is operational again.\nBest regards.';
+        }
+
+        // ── RACKLIGHT (235x + Recklight-Typos) ────────────────────────────
+        if (/racklight|rack\s*light|ranklights|recklight|recklights/.test(t))
+            return 'We restarted the Racklight. The Station is operational again.\nBest regards.';
+
+        // ── CHARGER (180x) ─────────────────────────────────────────────────
+        if (/\bcharger\b/.test(t)) {
+            if (/obstruction|item|drin|inside/.test(t))
+                return 'We removed the obstruction from the Charger. The Charger is operational again.\nBest regards.';
+            if (/handscanner|hand scanner/.test(t))
+                return 'We fixed the Handscanner Charger. The Scanner is operational again.\nBest regards.';
+            return 'We fixed the Charger. The Charger is operational again.\nBest regards.';
+        }
+
+        // ── CONVEYOR / OUTBOUND / INBOUND (516x) ──────────────────────────
+        if (/conveyor|conveyer|convey|outbound|inbound/.test(t)) {
+            if (/jam|stuck|klemmt|blockiert|blocked|steht/.test(t))
+                return 'We removed the Jam/obstruction. The Conveyor is operational again.\nBest regards.';
+            if (/belt|riemen/.test(t))
+                return 'We fixed the Belt. The Conveyor is operational again.\nBest regards.';
+            return 'We fixed the Conveyor. The Conveyor is operational again.\nBest regards.';
+        }
+
+        // ── COGNEX (131x) ──────────────────────────────────────────────────
+        if (/cognex/.test(t))
+            return 'We fixed the Cognex Scanner. The Station is operational again.\nBest regards.';
+
+        // ── HANDSCANNER / SCANNER (162x) ──────────────────────────────────
+        if (/handscanner|hand\s*scanner/.test(t)) {
+            if (/fehlt|missing|replace/.test(t))
+                return 'We replaced the Handscanner. The Station is operational again.\nBest regards.';
+            return 'We fixed the Handscanner. The Station is operational again.\nBest regards.';
+        }
+        if (/\bscanner\b/.test(t)) {
+            if (/fehlt|missing/.test(t))
+                return 'We replaced the Scanner. The Station is operational again.\nBest regards.';
+            return 'We fixed the Scanner. The Station is operational again.\nBest regards.';
+        }
+
+        // ── E-STOP (111x) ──────────────────────────────────────────────────
+        if (/estop|e-stop|e-stopp|floor stopped/.test(t))
+            return 'We removed the E-Stop. The Floor is operational again.\nBest regards.';
+
+        // ── DEPAL (89x) ────────────────────────────────────────────────────
+        if (/\bdepal\b/.test(t))
+            return 'We fixed the Jam/obstruction on the Depal. The Depalletizer is operational again.\nBest regards.';
+
+        // ── CONNECTION / VERBINDUNG (83x) ─────────────────────────────────
+        if (/connection\s*lost|lost\s*connection|verbindung|verloren/.test(t))
+            return 'We restored the connection. The Station is operational again.\nBest regards.';
+
+        // ── SRBRS WESTE ────────────────────────────────────────────────────
+        if (/weste|srbrs/.test(t))
+            return 'The E-Stop caused by the SRBRS vest has been removed. The Floor is operational again.\nBest regards.';
+
+        // ── RESTART / REBOOT / NEUSTART (327x) ────────────────────────────
+        if (/restart|reboot|neustart|neustarten|reset|computer|system\s*error|systemfehler|faulted\s*station|station\s*hängt|frozen|freeze|\bestart\b/.test(t))
+            return 'We restarted the System. The Station is operational again.\nBest regards.';
+
+        // ── PROJECTOR / BEAMER ─────────────────────────────────────────────
+        if (/beamer|magenta|projector/.test(t))
+            return 'We fixed the Projector. The Station is operational again.\nBest regards.';
+
+        // ── LIQUID / SPILL (68x) ───────────────────────────────────────────
+        if (/liquid|ausgelaufen|spill|öl\b|\boil\b|dirty\s*floor/.test(t))
+            return 'We cleaned the Area/Floor. The Area is operational again.\nBest regards.';
+
+        // ── ALARM (generisch) ──────────────────────────────────────────────
+        if (/\balarm\b/.test(t))
+            return 'We checked and reset the Safety/FIDO system. The Station is operational again.\nBest regards.';
+
+        // ── LOW CONFIDENCE ─────────────────────────────────────────────────
+        if (/low\s*confidence/.test(t))
+            return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
+
+        // ── AETHER ─────────────────────────────────────────────────────────
+        if (/aether|no\s*comms/.test(t))
+            return 'Aether on Floor2 is still not active in FRA7 yet because of missing KNX connection.\nBest regards.';
+
+        // ── LADDER ─────────────────────────────────────────────────────────
+        if (/\bladder\b/.test(t))
+            return 'We fixed the Ladder. The Ladder is operational again.\nBest regards.';
+
+        // ── TOTE (274x) ────────────────────────────────────────────────────
+        if (/\btote\b|\btotes\b/.test(t))
+            return 'We removed the stuck Tote. The Station is operational again.\nBest regards.';
+
+        // ── GATE (44x) ─────────────────────────────────────────────────────
+        if (/\bgate\b/.test(t))
+            return 'We fixed the Gate. The Gate is operational again.\nBest regards.';
+
+        // ── DEFAULT ────────────────────────────────────────────────────────
+        return 'The issue has been resolved. The Station/Floor/Drive is operational again.\nBest regards.';
     }
 
     // ==================== Keyboard Shortcuts ====================
