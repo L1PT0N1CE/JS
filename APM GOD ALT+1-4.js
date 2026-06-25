@@ -271,8 +271,14 @@
             const hasIP      = (statusComp?.store?.data?.items || []).some(r =>
                 r.data?.code === 'IP' || r.data?.value === 'IP'
             );
-            if (hasIP) setComboByCode('workorderstatus', 'IP');
-            else console.log('[APM-GOD] workorderstatus: IP nicht im Store (neues WO?) — überspringe');
+            if (hasIP) {
+                setComboByCode('workorderstatus', 'IP');
+            } else if (statusItems.length > 0) {
+                // Neues WO: IP nicht verfügbar → ersten Store-Eintrag setzen (= "Open")
+                statusComp.setValue(statusItems[0]);
+                statusComp.fireEvent && statusComp.fireEvent('select', statusComp, [statusItems[0]], {});
+                console.log('[APM-GOD] workorderstatus: fallback auf', statusItems[0]?.data?.code || statusItems[0]?.data?.value);
+            }
         }
 
         udfChar13Field.value = "EXDN";
