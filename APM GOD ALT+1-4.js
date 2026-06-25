@@ -215,6 +215,37 @@
         }
     }
 
+    // ── setComboByCode: ExtJS Combobox via internem Code setzen (nicht Display-Text) ──
+    // Sucht Record im Store → setValue(record) + fireEvent('select')
+    // Verhindert "cannot be blank" und leere/falsche Auswahl nach page-render
+    function setComboByCode(name, code) {
+        try {
+            const EXT = (typeof Ext !== 'undefined') ? Ext : window.Ext;
+            if (!EXT?.ComponentQuery) return false;
+            const comp  = EXT.ComponentQuery.query(`[name="${name}"]`)[0];
+            if (!comp)  return false;
+            const items = comp.store?.data?.items || [];
+            const rec   = items.find(r =>
+                r.data?.code   === code ||
+                r.data?.value  === code ||
+                r.data?.TYPE   === code ||
+                r.data?.STATUS === code
+            );
+            if (rec) {
+                comp.setValue(rec);
+                comp.fireEvent && comp.fireEvent('select', comp, [rec], {});
+                console.log('[APM-GOD] setComboByCode', name, '=', code, '✓');
+                return true;
+            }
+            comp.setValue(code); // String-Fallback
+            console.warn('[APM-GOD] setComboByCode', name, '— kein Record für', code, '(Store leer?)');
+            return false;
+        } catch (e) {
+            console.error('[APM-GOD] setComboByCode Fehler:', name, e.message);
+            return false;
+        }
+    }
+
     function autoFillFields() {
         const workOrderTypeField   = document.querySelector('input[name="workordertype"]');
         const workOrderStatusField = document.querySelector('input[name="workorderstatus"]');
@@ -229,12 +260,19 @@
 
         const changeEvent = new Event('change', { bubbles: true, cancelable: false });
 
-        workOrderTypeField.value = "Corrective";
-        workOrderTypeField.dispatchEvent(changeEvent);
+        // workordertype: Code 'CM' = Corrective — NICHT den Display-Text setzen
+        setComboByCode('workordertype', 'CM');
 
-        if (workOrderStatusField.value !== "In Progress") {
-            workOrderStatusField.value = "In Progress";
-            workOrderStatusField.dispatchEvent(changeEvent);
+        // workorderstatus: Code 'IP' = In Progress
+        // Neue / selbst erstellte WOs haben manchmal nur 'Open' im Store → kein Fehler
+        {
+            const EXT        = (typeof Ext !== 'undefined') ? Ext : window.Ext;
+            const statusComp = EXT?.ComponentQuery?.query('[name="workorderstatus"]')[0];
+            const hasIP      = (statusComp?.store?.data?.items || []).some(r =>
+                r.data?.code === 'IP' || r.data?.value === 'IP'
+            );
+            if (hasIP) setComboByCode('workorderstatus', 'IP');
+            else console.log('[APM-GOD] workorderstatus: IP nicht im Store (neues WO?) — überspringe');
         }
 
         udfChar13Field.value = "EXDN";
