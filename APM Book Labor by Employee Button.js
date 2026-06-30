@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const LS_KEY = 'apmUsername';
+  const LS_KEY = 'bl_username';        // eigener Key — kein Konflikt mit apmUsername (APM GOD)
   const LS_USERS_KEY = 'apmUserList';
 
   /* ================= USERNAME HANDLING ================= */
@@ -372,7 +372,6 @@
       changeLink.onclick = (e) => {
         e.preventDefault();
         closeOverlay();
-        // Öffnet den User-Switch-Modal, danach zurück zum Hauptmenü
         openUserSwitchModal(null, () => openMainModal());
       };
 
