@@ -191,7 +191,7 @@
                 }
                 function process(ls) {
                     if (resolved) return; resolved = true;
-                    const stars = getStars();
+                    const lm = getShiftLoginMap();
                     const gridLogins = getGridLogins();
                     finish((ls.getRange ? ls.getRange() : (ls.data&&ls.data.items||[])).map((item, i) => {
                         const d = item.data;
@@ -416,7 +416,7 @@
             body.innerHTML = '<div style="padding:12px;text-align:center;color:#999;">Keine Daten</div>';
             return;
         }
-        const lm = getShiftLoginMap();
+        const stars = getStars();
         let tB = 0, tBl = 0;
         let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
             <thead><tr style="background:#f0f0f0;border-bottom:2px solid #ddd;position:sticky;top:0;">
