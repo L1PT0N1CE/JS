@@ -127,7 +127,9 @@
             function selectAndLoad(iExt, listStore) {
                 let idx = 0;
                 for (let i = 0; i < listStore.getCount(); i++) {
-                    const d = listStore.data.items[i].data;
+                    const rec = listStore.getAt ? listStore.getAt(i) : (listStore.data?.items?.[i]);
+                    if (!rec) continue;
+                    const d = rec.data;
                     if ((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73') { idx = i; break; }
                 }
                 for (const g of iExt.ComponentQuery.query('gridpanel')) {
