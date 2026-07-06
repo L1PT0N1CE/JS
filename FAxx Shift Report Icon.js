@@ -14,6 +14,8 @@
     const SR_SETTINGS = 'sr-shift-settings-v2';
     const CACHE_KEY   = 'fa73_float_cache_v1';
     const STATE_KEY   = 'fa73_float_state_v1';
+    const STARS_KEY   = 'fa73_float_stars_v1';
+    const DEFAULT_STARS = ['kanataza', 'rmalogor', 'hsshimen'];
     const REFRESH_MS  = 5 * 60 * 1000;
 
     const EAM_ORDER = [
@@ -24,6 +26,7 @@
 
     let _loading = false;
     let _lastRefresh = 0;
+    let _lastRows = null;
 
     // ─── State ────────────────────────────────────────────────────────────────
     function getState() {
@@ -31,6 +34,18 @@
     }
     function saveState(o) {
         try { localStorage.setItem(STATE_KEY, JSON.stringify(o)); } catch(e) {}
+    }
+
+    // ─── Sterne ────────────────────────────────────────────────────────────────────────
+    function getStars() {
+        try {
+            const a = JSON.parse(localStorage.getItem(STARS_KEY) || 'null');
+            if (Array.isArray(a)) return new Set(a);
+        } catch(e) {}
+        return new Set(DEFAULT_STARS);
+    }
+    function saveStars(s) {
+        try { localStorage.setItem(STARS_KEY, JSON.stringify([...s])); } catch(e) {}
     }
 
     // ─── Cache ────────────────────────────────────────────────────────────────
@@ -176,7 +191,7 @@
                 }
                 function process(ls) {
                     if (resolved) return; resolved = true;
-                    const lm = getShiftLoginMap();
+                    const stars = getStars();
                     const gridLogins = getGridLogins();
                     finish((ls.getRange ? ls.getRange() : (ls.data&&ls.data.items||[])).map((item, i) => {
                         const d = item.data;
@@ -309,6 +324,18 @@
         root.appendChild(fab);
         document.body.appendChild(root);
 
+        // Stern-Toggle via Event-Delegation
+        body.addEventListener('click', e => {
+            const star = e.target.closest('.fa73-star');
+            if (!star) return;
+            e.stopPropagation();
+            const login = star.dataset.login;
+            const s = getStars();
+            if (s.has(login)) s.delete(login); else s.add(login);
+            saveStars(s);
+            if (_lastRows) renderTable(_lastRows);
+        });
+
         // ── Drag ──────────────────────────────────────────────────────────────
         let dragging = false, dragged = false, dragOffX = 0, dragOffY = 0;
 
@@ -382,6 +409,7 @@
     }
 
     function renderTable(rows) {
+        _lastRows = rows;
         const body = document.getElementById('fa73-float-body');
         if (!body) return;
         if (!rows || !rows.length) {
@@ -405,18 +433,18 @@
             const b  = parseFloat((row.booked   || '0').replace(',', '.')) || 0;
             const bl = parseFloat((row.billable || '0').replace(',', '.')) || 0;
             tB += b; tBl += bl;
-            const hl = row.hl || !!(lm[row.person]?.hl);
+            const hl = stars.has(row.person);
             const bg = row.status === 'AW' ? '#ffcdd2'
                      : b === 0             ? '#ffebee'
                      : bl > b              ? '#fff9c4'
                      : bl < b              ? '#bbdefb'
                      : bl === b && b > 0   ? '#c8e6c9' : '#fff';
-            const nc = hl ? 'color:#d32f2f;font-weight:bold;' : '';
+            const nc = hl ? 'color:#00bcd4;font-weight:bold;' : '';
             const st = row.status === 'AW' ? '<span style="background:#c00;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">AW</span>'
                      : row.status === 'U'  ? '<span style="background:#e65100;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">U</span>'
                      : row.status          ? `<span style="background:#eee;padding:0 3px;border-radius:2px;">${row.status}</span>` : '';
             html += `<tr style="background:${bg};border-bottom:1px solid #f0f0f0;">
-                <td style="padding:3px 6px;${nc}">${hl ? '★ ' : ''}${row.person || '—'}</td>
+                <td style="padding:3px 6px;${nc}"><span class="fa73-star" data-login="${row.person}" style="cursor:pointer;color:${hl ? '#00bcd4' : '#ccc'};margin-right:3px;" title="Stern togglen">★</span>${row.person || '—'}</td>
                 <td style="padding:3px 6px;color:#666;">${row.trade}</td>
                 <td style="padding:3px 6px;text-align:center;font-weight:bold;">${row.booked  || '—'}</td>
                 <td style="padding:3px 6px;text-align:center;">${row.billable || '—'}</td>
