@@ -1,0 +1,873 @@
+(function () {
+    'use strict';
+
+    const PANEL_ID   = 'aki-sim-panel';
+    const OVERLAY_ID = 'aki-sim-overlay';
+    const REFRESH_MS = 3 * 60 * 1000;
+    const GQL_URL    = 'https://sim-ticketing-graphql-fleet.corp.amazon.com/graphql';
+    const EAM_WO_URL = 'https://eu1.eam.hxgnsmartcloud.com/web/base/logindisp?tenant=AMAZONRMEEU_PRD&FROMEMAIL=YES&SYSTEM_FUNCTION_NAME=WSJOBS&USER_FUNCTION_NAME=WSJOBS&workordernum=';
+
+    const GQL_LIST_QUERY = `query issueListView($query: String!, $rows: Int, $start: Int, $sort: String) {
+  queryIssues(query: $query, rows: $rows, start: $start, sort: $sort) {
+    total
+    documents {
+      id shortId severity title status ticketingStatus createDate lastUpdatedDate
+      assignee { id name protocol __typename }
+      extensions { tt { assignedGroup __typename } __typename }
+      __typename
+    }
+    __typename
+  }
+}`;
+
+    const FILTERS = {
+        ar: {
+            label: 'FRA7 AR',
+            query: 'isTicket:true AND extensions.tt.status:(Assigned OR "Work In Progress" OR Researching OR Pending) AND currentSeverity:(1 OR 2 OR 3 OR 4 OR 5 OR 2.5 OR N) AND extensions.tt.assignedGroup:FRA7-RME AND full_text:(\\[FRA7\\]\\[AR\\] OR \\[pakiva\\] OR \\[PakivaA02\\] OR \\[PakivaA03\\])',
+        },
+        all: {
+            label: 'RME ALL',
+            query: 'isTicket:true AND extensions.tt.status:(Assigned OR "Work In Progress" OR Researching OR Pending) AND currentSeverity:(1 OR 2 OR 3 OR 4 OR 5 OR 2.5 OR N) AND extensions.tt.assignedGroup:FRA7-RME AND NOT extensions.tt.assignee.id:"email-alias:091d45b8-a458-4201-aa82-45f7f6fc8010"',
+        },
+    };
+
+    function makeListBody(filterKey) {
+        return JSON.stringify({
+            operationName: 'issueListView',
+            variables: { rows: 50, sort: 'createDate desc', query: FILTERS[filterKey].query },
+            query: GQL_LIST_QUERY,
+        });
+    }
+
+    let _loading = false;
+    let _lastRefresh = 0;
+    let _lastData = null;
+    let _activeFilter = localStorage.getItem('sim_default_filter') || 'ar';
+    let _defaultFilter = localStorage.getItem('sim_default_filter') || 'ar';
+    const _woCache = {};
+
+    // ── GQL Post ─────────────────────────────────────────────────────────────────
+
+    function gqlPost(body, onDone) {
+        GM_xmlhttpRequest({
+            method: 'POST', url: GQL_URL,
+            headers: {
+                'Content-Type': 'application/json',
+                'Origin': 'https://t.corp.amazon.com',
+                'Referer': 'https://t.corp.amazon.com/',
+                'Accept': '*/*',
+            },
+            data: typeof body === 'string' ? body : JSON.stringify(body),
+            withCredentials: true,
+            onload:  res => onDone(null, res),
+            onerror: err => onDone(err, null),
+        });
+    }
+
+    // ── Template-Texte (aus Ticket-Titel) ────────────────────────────────────────
+
+    function getResponseTextFromTitle(title) {
+        const t = (title || '').toLowerCase();
+
+        if (/destacker|destecker|destucker|destauker|destaker|dastaker|dasticker|desteker|descaker|destaucker|distek|distak|disteck|stacker/.test(t))
+            return 'We restarted the Destacker. The Station is operational again.\nBest regards.';
+        if (/\bdrive\b|\bdu\b/.test(t)) {
+            if (/charger|faulted/.test(t))
+                return 'We removed the Drive from the Charger and reset it. The Drive is operational again.\nBest regards.';
+            if (/out of service|wont go in service|not going in service/.test(t))
+                return 'We put the Drive back in service. The Drive is operational again.\nBest regards.';
+            if (/stuck|item|obstruction|klemmt/.test(t))
+                return 'We removed the obstruction from the Drive. The Drive is operational again.\nBest regards.';
+            if (/wlan|wifi|connect|verbindung/.test(t))
+                return 'We fixed the WLAN connection of the Drive. The Drive is operational again.\nBest regards.';
+            return 'We fixed the Drive. The Drive is operational again.\nBest regards.';
+        }
+        if (/fiducial|fiducal/.test(t))
+            return 'We replaced the Fiducial. The Floor is operational again.\nBest regards.';
+        if (/\bpod\b/.test(t)) {
+            if (/dirty|clean|reinigung|binclean/.test(t))
+                return 'We cleaned the POD/Bin. The POD is operational again.\nBest regards.';
+            if (/hook|tilted|kippe/.test(t))
+                return 'We fixed the POD hook. The POD is operational again.\nBest regards.';
+            return 'We fixed the POD. The POD is operational again.\nBest regards.';
+        }
+        if (/dirty|bin reinigung|binreinigung|binclean/.test(t))
+            return 'We cleaned the POD/Bin. The POD is operational again.\nBest regards.';
+        if (/screen|frozen|froze|freeze|bildschirm|display|white screen|black screen|eingefroren|eingefrohren/.test(t))
+            return 'We restarted the Station. The Station is operational again.\nBest regards.';
+        if (/lifter|elevator/.test(t)) {
+            if (/stuck|klemmt|blocked|middle/.test(t))
+                return 'We fixed the stuck Lifter/Elevator. The Station is operational again.\nBest regards.';
+            if (/calibrat|adjust|level/.test(t))
+                return 'We calibrated the Lifter. The Station is operational again.\nBest regards.';
+            return 'We restarted the Lifter/Elevator. The Station is operational again.\nBest regards.';
+        }
+        if (/\bfido\b/.test(t))
+            return 'We checked and reset the FIDO safety system. The Station is operational again.\nBest regards.';
+        if (/\bids\b/.test(t)) {
+            if (/connection|lost|verbindung/.test(t))
+                return 'We restored the IDS connection. The Station is operational again.\nBest regards.';
+            return 'We restarted the IDS. The Station is operational again.\nBest regards.';
+        }
+        if (/\brolle\b|\broller\b|\brollen\b/.test(t)) {
+            if (/fehlt|missing/.test(t))
+                return 'We replaced the missing Roller. The Station is operational again.\nBest regards.';
+            if (/defekt|broken|defect/.test(t))
+                return 'We replaced the defective Roller. The Station is operational again.\nBest regards.';
+            return 'We fixed the Roller. The Station is operational again.\nBest regards.';
+        }
+        if (/racklight|rack\s*light|ranklights|recklight|recklights/.test(t))
+            return 'We restarted the Racklight. The Station is operational again.\nBest regards.';
+        if (/\bcharger\b/.test(t)) {
+            if (/obstruction|item|drin|inside/.test(t))
+                return 'We removed the obstruction from the Charger. The Charger is operational again.\nBest regards.';
+            if (/handscanner|hand scanner/.test(t))
+                return 'We fixed the Handscanner Charger. The Scanner is operational again.\nBest regards.';
+            return 'We fixed the Charger. The Charger is operational again.\nBest regards.';
+        }
+        if (/conveyor|conveyer|convey|outbound|inbound/.test(t)) {
+            if (/jam|stuck|klemmt|blockiert|blocked|steht/.test(t))
+                return 'We removed the Jam/obstruction. The Conveyor is operational again.\nBest regards.';
+            if (/belt|riemen/.test(t))
+                return 'We fixed the Belt. The Conveyor is operational again.\nBest regards.';
+            return 'We fixed the Conveyor. The Conveyor is operational again.\nBest regards.';
+        }
+        if (/cognex/.test(t))
+            return 'We fixed the Cognex Scanner. The Station is operational again.\nBest regards.';
+        if (/handscanner|hand\s*scanner/.test(t)) {
+            if (/fehlt|missing|replace/.test(t))
+                return 'We replaced the Handscanner. The Station is operational again.\nBest regards.';
+            return 'We fixed the Handscanner. The Station is operational again.\nBest regards.';
+        }
+        if (/\bscanner\b/.test(t)) {
+            if (/fehlt|missing/.test(t))
+                return 'We replaced the Scanner. The Station is operational again.\nBest regards.';
+            return 'We fixed the Scanner. The Station is operational again.\nBest regards.';
+        }
+        if (/estop|e-stop|e-stopp|floor stopped/.test(t))
+            return 'We removed the E-Stop. The Floor is operational again.\nBest regards.';
+        if (/\bdepal\b/.test(t))
+            return 'We fixed the Jam/obstruction on the Depal. The Depalletizer is operational again.\nBest regards.';
+        if (/connection\s*lost|lost\s*connection|verbindung|verloren/.test(t))
+            return 'We restored the connection. The Station is operational again.\nBest regards.';
+        if (/weste|srbrs/.test(t))
+            return 'The E-Stop caused by the SRBRS vest has been removed. The Floor is operational again.\nBest regards.';
+        if (/restart|reboot|neustart|neustarten|reset|computer|system\s*error|systemfehler|faulted\s*station|station\s*h\u00e4ngt|frozen|freeze|\bestart\b/.test(t))
+            return 'We restarted the System. The Station is operational again.\nBest regards.';
+        if (/beamer|magenta|projector/.test(t))
+            return 'We fixed the Projector. The Station is operational again.\nBest regards.';
+        if (/liquid|ausgelaufen|spill|öl\b|\boil\b|dirty\s*floor/.test(t))
+            return 'We cleaned the Area/Floor. The Area is operational again.\nBest regards.';
+        if (/\balarm\b/.test(t))
+            return 'We checked and reset the Safety/FIDO system. The Station is operational again.\nBest regards.';
+        if (/low\s*confidence/.test(t))
+            return 'We checked, cleaned and aligned the Cameras. The Stations are operational again.\nBest regards.';
+        if (/aether|no\s*comms/.test(t))
+            return 'Aether on Floor2 is still not active in FRA7 yet because of missing KNX connection.\nBest regards.';
+        if (/\bladder\b/.test(t))
+            return 'We fixed the Ladder. The Ladder is operational again.\nBest regards.';
+        if (/\btote\b|\btotes\b/.test(t))
+            return 'We removed the stuck Tote. The Station is operational again.\nBest regards.';
+        if (/\bgate\b/.test(t))
+            return 'We fixed the Gate. The Gate is operational again.\nBest regards.';
+        return 'The issue has been resolved. The Station/Floor/Drive is operational again.\nBest regards.';
+    }
+
+    // ── Overlay ───────────────────────────────────────────────────────────────────
+
+    const SEV_WORD = {'ONE':'1','TWO':'2','THREE':'3','FOUR':'4','FIVE':'5','N':'N'};
+    const SEV_C = {'1':'#7b0000','2':'#cc0000','3':'#b45309','4':'#1565c0','5':'#2e7d32','N':'#888'};
+    const sevKey = v => SEV_WORD[String(v).toUpperCase()] || String(v);
+
+    const MSGTYPE_COLORS = {
+        'CORRESPONDENCE': {bg:'#e8f4fd', border:'#90caf9', badge:'#1565c0', label:'Correspondence'},
+        'WORKLOG':        {bg:'#f0faf0', border:'#a5d6a7', badge:'#2e7d32', label:'Work Log'},
+        'SYNOPSIS':       {bg:'#ede7f6', border:'#b39ddb', badge:'#4527a0', label:'Synopsis'},
+        'TICKET_SYNOPSIS':{bg:'#ede7f6', border:'#b39ddb', badge:'#4527a0', label:'Synopsis'},
+        'ANNOTATION':     {bg:'#fce4ec', border:'#f48fb1', badge:'#880e4f', label:'Annotation'},
+        'DEFAULT':        {bg:'#fff3e0', border:'#ffcc80', badge:'#e65100', label:'Thread'},
+    };
+
+    function openCommOverlay(shortId, title) {
+        const old = document.getElementById(OVERLAY_ID);
+        if (old) old.remove();
+        const commUrl = `https://t.corp.amazon.com/${shortId}/communication`;
+        const te = (title||'').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        const ts = te.substring(0,80) + (te.length>80?'…':'');
+        const ov = document.createElement('div');
+        ov.id = OVERLAY_ID;
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;';
+        ov.innerHTML = `
+<div style="width:74vw;max-width:980px;height:86vh;background:#fff;border-radius:6px;
+            display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.45);">
+  <div style="background:#232f3e;color:#fff;padding:7px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+    <span style="font-weight:bold;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${te}">${shortId} — ${ts}</span>
+    <a href="${commUrl}" target="_blank" style="color:#ff9900;font-size:11px;text-decoration:none;white-space:nowrap;border:1px solid #ff9900;padding:2px 8px;border-radius:3px;">&#8599; In SIM</a>
+    <span id="sim-ov-close" style="color:#aaa;font-size:18px;cursor:pointer;padding:0 4px;user-select:none;">&#10005;</span>
+  </div>
+  <div style="display:flex;border-bottom:2px solid #e0e0e0;flex-shrink:0;background:#fafafa;">
+    <button id="sim-tab-ov" style="padding:7px 18px;font-size:12px;font-weight:bold;border:none;border-bottom:2px solid #ff9900;background:transparent;cursor:pointer;color:#232f3e;margin-bottom:-2px;">Übersicht</button>
+    <button id="sim-tab-co" style="padding:7px 18px;font-size:12px;font-weight:bold;border:none;border-bottom:2px solid transparent;background:transparent;cursor:pointer;color:#666;margin-bottom:-2px;">Kommunikation</button>
+  </div>
+  <div id="sim-pane-overview" style="flex:1;overflow-y:auto;padding:14px 16px;background:#f7f7f7;font-size:12px;">
+    <div style="text-align:center;padding:40px;color:#888;">Lade…</div>
+  </div>
+  <div id="sim-pane-comm" style="display:none;flex:1;overflow:hidden;flex-direction:column;background:#f7f7f7;">
+    <div id="sim-comm-threads" style="flex:1;overflow-y:auto;padding:12px 16px;min-height:0;"></div>
+    <div style="flex-shrink:0;border-top:2px solid #e0e0e0;padding:10px 16px;background:#fff;">
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;">
+          <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center;">
+            <span style="font-size:11px;color:#555;font-weight:bold;">Typ:</span>
+            <select id="sim-reply-type" style="font-size:11px;border:1px solid #ccc;border-radius:3px;padding:2px 6px;background:#fff;">
+              <option value="CORRESPONDENCE">Correspondence</option>
+              <option value="WORKLOG">Work Log</option>
+            </select>
+            <span id="sim-send-status" style="font-size:10px;color:#888;margin-left:4px;"></span>
+          </div>
+          <div style="display:flex;gap:5px;margin-bottom:5px;">
+            <button id="sim-tpl-empfang" style="font-size:10px;padding:2px 9px;border-radius:3px;border:1px solid #bbb;background:#f0f0f0;cursor:pointer;font-family:Arial,sans-serif;" title="Empfangsbestätigung einfügen">📩 Empfang</button>
+            <button id="sim-tpl-loesung" style="font-size:10px;padding:2px 9px;border-radius:3px;border:1px solid #bbb;background:#f0f0f0;cursor:pointer;font-family:Arial,sans-serif;" title="Lösungstext aus Titel einfügen">✅ Lösung</button>
+          </div>
+          <textarea id="sim-reply-text" placeholder="Nachricht… (Enter = Senden, Shift+Enter = Neue Zeile)"
+            style="width:100%;height:72px;font-size:12px;font-family:Arial,sans-serif;border:1px solid #ccc;border-radius:3px;padding:7px 9px;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <button id="sim-send-btn" style="height:44px;padding:0 18px;background:#232f3e;color:#fff;font-size:12px;font-weight:bold;border:none;border-radius:3px;cursor:pointer;flex-shrink:0;">Senden &#8629;</button>
+      </div>
+    </div>
+  </div>
+</div>`;
+        document.body.appendChild(ov);
+
+        const sw = (tab) => {
+            const o=document.getElementById('sim-pane-overview'), c=document.getElementById('sim-pane-comm');
+            const t1=document.getElementById('sim-tab-ov'), t2=document.getElementById('sim-tab-co');
+            if (!o||!c) return;
+            if (tab==='ov') { o.style.display='block'; c.style.display='none'; t1.style.borderBottomColor='#ff9900'; t1.style.color='#232f3e'; t2.style.borderBottomColor='transparent'; t2.style.color='#666'; }
+            else { o.style.display='none'; c.style.display='flex'; c.style.flexDirection='column'; t2.style.borderBottomColor='#ff9900'; t2.style.color='#232f3e'; t1.style.borderBottomColor='transparent'; t1.style.color='#666'; }
+        };
+        document.getElementById('sim-tab-ov').addEventListener('click', () => sw('ov'));
+        document.getElementById('sim-tab-co').addEventListener('click', () => sw('co'));
+        const close = () => ov.remove();
+        document.getElementById('sim-ov-close').addEventListener('click', close);
+        ov.addEventListener('click', e => { if (e.target===ov) close(); });
+        document.addEventListener('keydown', function escH(e) { if (e.key==='Escape') { close(); document.removeEventListener('keydown',escH); } });
+        // Template-Buttons: Text einfüllen ohne zu senden
+        const EMPFANG_TEXT = 'Hello,\nthe RME team has received your ticket and will process your request as soon as possible.\nBest regards.';
+        document.getElementById('sim-tpl-empfang').addEventListener('click', () => {
+            const ta = document.getElementById('sim-reply-text');
+            ta.value = EMPFANG_TEXT;
+            ta.focus();
+        });
+        document.getElementById('sim-tpl-loesung').addEventListener('click', () => {
+            const ta = document.getElementById('sim-reply-text');
+            ta.value = getResponseTextFromTitle(title);
+            ta.focus();
+        });
+        document.getElementById('sim-reply-text').addEventListener('keydown', e => {
+            if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('sim-send-btn').click(); }
+        });
+        document.getElementById('sim-send-btn').addEventListener('click', () => {
+            const txt=(document.getElementById('sim-reply-text').value||'').trim();
+            const typ=document.getElementById('sim-reply-type').value;
+            const st=document.getElementById('sim-send-status');
+            if (!txt) { st.textContent='Bitte Text eingeben'; st.style.color='#c00'; return; }
+            st.textContent='Sendet…'; st.style.color='#888';
+            document.getElementById('sim-send-btn').disabled=true;
+            sendReply(shortId, txt, typ, (ok, msg) => {
+                document.getElementById('sim-send-btn').disabled=false;
+                if (ok) { st.textContent='Gesendet!'; st.style.color='#2e7d32'; document.getElementById('sim-reply-text').value=''; loadThreads(shortId); }
+                else { st.textContent='Fehler: '+(msg||'?'); st.style.color='#c00'; }
+            });
+        });
+        loadIssueOverview(shortId);
+        loadThreads(shortId);
+    }
+
+    // ── Assign to Me ─────────────────────────────────────────────────────────────
+
+    function getMyIdentity() {
+        let stored = localStorage.getItem('sim_my_identity');
+        if (stored) return stored;
+        // Auto-detect from EAM login keys
+        const alias = localStorage.getItem('wf4_defaultEmployee') || localStorage.getItem('apmUsername') || localStorage.getItem('bl_username');
+        if (alias) {
+            stored = 'kerberos:' + alias + '@ANT.AMAZON.COM';
+            localStorage.setItem('sim_my_identity', stored);
+            return stored;
+        }
+        // Fallback: prompt once
+        const inp = prompt('Gib deinen Amazon-Login ein (z.B. kanataza):');
+        if (!inp) return null;
+        stored = 'kerberos:' + inp.trim().toLowerCase() + '@ANT.AMAZON.COM';
+        localStorage.setItem('sim_my_identity', stored);
+        return stored;
+    }
+
+    function attachAssignBtn(shortId) {
+        const btn = document.getElementById('sim-assign-me-btn');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            const issueId = window._simCurrentIssueId;
+            const identity = getMyIdentity();
+            if (!issueId || !identity) return;
+            btn.disabled = true;
+            btn.textContent = '…';
+            gqlPost({
+                operationName: 'assignIssue',
+                variables: { issueId, assignee: identity },
+                query: `mutation assignIssue($issueId: String!, $assignee: String!) {
+  assignIssue(issueId: $issueId, assignee: $assignee) {
+    id
+    assignee { id name protocol __typename }
+    __typename
+  }
+}`
+            }, (err, res) => {
+                btn.disabled = false;
+                if (err || !res || res.status !== 200) {
+                    btn.textContent = '✗'; btn.style.borderColor = '#c00'; btn.style.color = '#c00';
+                    setTimeout(() => { btn.textContent = '👤 Assign to Me'; btn.style.borderColor = ''; btn.style.color = ''; }, 2500);
+                    return;
+                }
+                let j; try { j = JSON.parse(res.responseText); } catch(e) {}
+                const ok = j && j.data && j.data.assignIssue && !(j.errors && j.errors.length);
+                if (ok) {
+                    btn.textContent = '✓ Assigned!'; btn.style.borderColor = '#2e7d32'; btn.style.color = '#2e7d32';
+                    setTimeout(() => loadIssueOverview(shortId), 800);
+                } else {
+                    const msg = j && j.errors && j.errors[0] && j.errors[0].message;
+                    btn.textContent = '✗ ' + (msg || 'Fehler'); btn.style.borderColor = '#c00'; btn.style.color = '#c00';
+                    setTimeout(() => { btn.textContent = '👤 Assign to Me'; btn.style.borderColor = ''; btn.style.color = ''; }, 3000);
+                }
+            });
+        });
+    }
+
+    // ── Übersicht ─────────────────────────────────────────────────────────────────
+
+    function loadIssueOverview(shortId) {
+        const pane = document.getElementById('sim-pane-overview');
+        if (!pane) return;
+        gqlPost({ operationName:'getIssueOverview', variables:{id:shortId},
+            query:`query getIssueOverview($id: String!) {
+  issue(id: $id) { id shortId title status severity createDate lastUpdatedDate description assignee { name } extensions { tt { assignedGroup } } }
+}` }, (err,res) => {
+            if (!pane.isConnected) return;
+            if (err) { pane.innerHTML=errBox('Netzwerkfehler'); return; }
+            let j; try { j=JSON.parse(res.responseText); } catch(e) { pane.innerHTML=errBox('Parse-Fehler'); return; }
+            const iss=j&&j.data&&j.data.issue;
+            if (!iss) { pane.innerHTML=errBox('Nicht gefunden (HTTP '+res.status+')'); return; }
+            window._simCurrentIssueId = iss.id;
+            pane.innerHTML=buildOverviewHtml(iss);
+            attachAssignBtn(shortId);
+        });
+    }
+
+    function buildOverviewHtml(iss) {
+        const sc=SEV_C[sevKey(iss.severity)]||'#888';
+        const desc=(iss.description||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+        return `<div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:12px 16px;">
+  <div style="display:flex;gap:10px;margin-bottom:8px;">
+    <span style="background:${sc};color:#fff;border-radius:3px;padding:3px 8px;font-weight:bold;font-size:12px;flex-shrink:0;">${sevKey(iss.severity)||'?'}</span>
+    <div style="font-weight:bold;color:#111;font-size:13px;line-height:1.4;">${(iss.title||'').replace(/</g,'&lt;')}</div>
+  </div>
+  <table style="font-size:11px;color:#555;border-collapse:collapse;width:100%;">
+    <tr><td style="padding:2px 8px 2px 0;font-weight:bold;width:100px;">Status</td><td>${iss.status||'—'}</td></tr>
+    <tr><td style="padding:2px 8px 2px 0;font-weight:bold;">Assignee</td><td style="display:flex;align-items:center;gap:8px;">${(iss.assignee&&iss.assignee.name)||'—'}<button id="sim-assign-me-btn" style="font-size:10px;padding:1px 8px;border-radius:3px;border:1px solid #bbb;background:#f5f5f5;cursor:pointer;font-family:Arial,sans-serif;white-space:nowrap;" title="Ticket mir zuweisen">👤 Assign to Me</button></td></tr>
+    <tr><td style="padding:2px 8px 2px 0;font-weight:bold;">Gruppe</td><td>${(iss.extensions&&iss.extensions.tt&&iss.extensions.tt.assignedGroup)||'—'}</td></tr>
+    <tr><td style="padding:2px 8px 2px 0;font-weight:bold;">Erstellt</td><td>${iss.createDate?new Date(iss.createDate).toLocaleString('de-DE'):'—'}</td></tr>
+    <tr><td style="padding:2px 8px 2px 0;font-weight:bold;">Geändert</td><td>${iss.lastUpdatedDate?new Date(iss.lastUpdatedDate).toLocaleString('de-DE'):'—'}</td></tr>
+  </table>
+  ${desc?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;color:#333;font-size:11px;line-height:1.7;">${desc}</div>`:''}
+</div>`;
+    }
+
+    // ── Kommunikation laden ───────────────────────────────────────────────────────
+
+    function loadThreads(shortId) {
+        const pane = document.getElementById('sim-comm-threads');
+        if (!pane) return;
+        pane.innerHTML = '<div style="text-align:center;padding:20px;color:#888;font-size:11px;">Lade Kommunikation…</div>';
+        gqlPost({
+            operationName: 'ticketThreads',
+            variables: { id: shortId },
+            query: `query ticketThreads($id: String!) {
+  issue(id: $id) {
+    id
+    threads { id name createDate totalCount __typename }
+    __typename
+  }
+}`
+        }, (err, res) => {
+            if (!pane.isConnected) return;
+            if (err) { pane.innerHTML = errBox('Netzwerkfehler'); return; }
+            let j; try { j = JSON.parse(res.responseText); } catch(e) { pane.innerHTML = errBox('Parse-Fehler'); return; }
+            const threads = (j&&j.data&&j.data.issue&&j.data.issue.threads) || [];
+            if (!threads.length) { pane.innerHTML = '<div style="padding:12px;color:#888;text-align:center;font-size:11px;">Keine Threads</div>'; return; }
+            const updThread = threads.find(t => t.id && t.id.startsWith('updates:'));
+            if (updThread) window._simThreadId = updThread.id;
+            pane.innerHTML = '';
+            threads.forEach(thread => {
+                const section = document.createElement('div');
+                section.style.cssText = 'margin-bottom:12px;';
+                section.innerHTML = `<div style="font-weight:bold;font-size:11px;color:#555;padding:4px 0 6px 0;border-bottom:1px solid #e0e0e0;margin-bottom:6px;">${(thread.name||'Thread').replace(/</g,'&lt;')} <span style="font-weight:normal;color:#aaa;">(${thread.totalCount||0})</span></div>`;
+                pane.appendChild(section);
+                loadComments(thread.id, section);
+            });
+        });
+    }
+
+    function loadComments(threadId, container) {
+        gqlPost({
+            operationName: 'threadComments',
+            variables: { threadId, start: 0, rows: 1000, sort: 'newest_first' },
+            query: `query threadComments($threadId: String!, $start: Int, $rows: Int, $sort: CommentSortOrder) {
+  thread(id: $threadId) {
+    id totalCount
+    conversation(start: $start, rows: $rows, sort: $sort) {
+      id message contentType messageType createDate
+      author { id name protocol __typename }
+      submitter { id name protocol __typename }
+      __typename
+    }
+    __typename
+  }
+}`
+        }, (err, res) => {
+            if (!container.isConnected) return;
+            if (err || !res || res.status !== 200) {
+                container.innerHTML += '<div style="color:#c00;font-size:11px;padding:4px;">Fehler beim Laden</div>';
+                return;
+            }
+            let j; try { j = JSON.parse(res.responseText); } catch(e) { return; }
+            if (!j.data || !j.data.thread) {
+                const em = j.errors ? j.errors[0].message : 'HTTP '+res.status;
+                container.innerHTML += '<div style="color:#c00;font-size:11px;padding:4px;">'+em+'</div>';
+                return;
+            }
+            const conv = j.data.thread.conversation || [];
+            if (!conv.length) {
+                const el = document.createElement('div');
+                el.style.cssText = 'color:#aaa;font-size:11px;padding:4px;text-align:center;';
+                el.textContent = 'Keine Einträge';
+                container.appendChild(el);
+                return;
+            }
+            conv.forEach(c => container.appendChild(buildCommentCard(c)));
+        });
+    }
+
+    // Gibt Avatar-HTML zurück: Foto für kerberos-User, sonst farbiger Initialen-Kreis
+    function buildAvatarHTML(author) {
+        const name = (author && author.name) || '?';
+        const proto = (author && author.protocol) || '';
+        const initials = name.substring(0, 2).toUpperCase();
+        const hue = [...name].reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+        const fbStyle = `width:26px;height:26px;border-radius:50%;background:hsl(${hue},55%,42%);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;color:#fff;flex-shrink:0;`;
+        if (proto === 'kerberos') {
+            const alias = name.split('@')[0];
+            const photoUrl = `https://internal-cdn.amazon.com/badgephotos.amazon.com/?uid=${alias}`;
+            return `<span style="display:inline-flex;align-items:center;width:26px;height:26px;flex-shrink:0;" title="${name}">` +
+                   `<img src="${photoUrl}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;border:1px solid rgba(0,0,0,0.12);" ` +
+                   `onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" alt="${initials}">` +
+                   `<span style="${fbStyle}display:none;">${initials}</span>` +
+                   `</span>`;
+        }
+        return `<span style="${fbStyle}" title="${name}">${initials}</span>`;
+    }
+
+    function buildCommentCard(c) {
+        const cfg = MSGTYPE_COLORS[c.messageType] || MSGTYPE_COLORS['DEFAULT'];
+        const authorObj = c.author || c.submitter || {};
+        const author = authorObj.name || '?';
+        const date = c.createDate ? new Date(c.createDate).toLocaleString('de-DE') : '?';
+        const msg = (c.message||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+        const card = document.createElement('div');
+        card.style.cssText = `background:${cfg.bg};border:1px solid ${cfg.border};border-radius:4px;padding:8px 10px;margin-bottom:6px;font-size:11px;`;
+        card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+  <div style="display:flex;align-items:center;gap:6px;">
+    ${buildAvatarHTML(authorObj)}
+    <span style="background:${cfg.badge};color:#fff;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:bold;">${cfg.label}</span>
+    <span style="font-weight:bold;color:#333;">${author.replace(/</g,'&lt;')}</span>
+  </div>
+  <span style="color:#999;font-size:10px;">${date}</span>
+</div>
+<div style="color:#333;line-height:1.5;">${msg}</div>`;
+        return card;
+    }
+
+    // ── Antwort senden ────────────────────────────────────────────────────────────
+    // Confirmed via Debugger.getScriptSource (4141.bundle.js):
+    //   mutation createCommentOnThread($args: CommentInput!) {
+    //     createCommentGetComment(args: $args) { ... }
+    //   }
+    // contentType: 'text/plain' from webpackChunkSIMTicketingAssets mod 75403
+
+    function sendReply(shortId, message, messageType, onDone) {
+        const threadId = window._simThreadId;
+        if (!threadId) {
+            onDone(false, 'Thread-ID fehlt — Kommunikation-Tab neu öffnen');
+            return;
+        }
+        gqlPost({
+            operationName: 'createCommentOnThread',
+            variables: {
+                args: {
+                    threadId,
+                    contentType: 'text/plain',
+                    message,
+                    messageType,
+                    mentions: [],
+                }
+            },
+            query: `mutation createCommentOnThread($args: CommentInput!) {
+  createCommentGetComment(args: $args) {
+    id message messageType createDate
+    author { id name protocol __typename }
+    submitter { id name protocol __typename }
+    __typename
+  }
+}`
+        }, (err, res) => {
+            if (err || !res) { onDone(false, 'Netzwerkfehler'); return; }
+            let j; try { j = JSON.parse(res.responseText); } catch(e) { onDone(false, 'Parse-Fehler'); return; }
+            const ok = res.status === 200 && j && j.data && j.data.createCommentGetComment
+                       && !(j.errors && j.errors.length);
+            if (ok) {
+                onDone(true, null);
+            } else {
+                const errMsg = (j&&j.errors&&j.errors[0]&&j.errors[0].message) || `HTTP ${res.status}`;
+                console.log('[SIM send] Fehler:', errMsg, JSON.stringify(j).substring(0,300));
+                onDone(false, errMsg);
+            }
+        });
+    }
+
+    // ── Work Order Extraktion ─────────────────────────────────────────────────────
+
+    function extractWO(messages) {
+        for (const msg of messages) {
+            let m;
+            if ((m = msg.match(/workordernum=(\d+)/)))            return m[1];
+            if ((m = msg.match(/WO\s+(\d{8,})/i)))               return m[1];
+            if ((m = msg.match(/EAM\(APM\)[^0-9]*(\d{8,})/i)))   return m[1];
+            if ((m = msg.match(/work[\s_-]*order[^0-9]*(\d{8,})/i))) return m[1];
+            if ((m = msg.match(/number\s*:\s*(\d{8,})/i)))        return m[1];
+        }
+        return null;
+    }
+
+    function fetchWOForDoc(doc, cb) {
+        const sid = doc.shortId;
+        if (_woCache[sid] !== undefined) { cb(_woCache[sid]); return; }
+        gqlPost({
+            operationName: 'threadComments',
+            variables: { threadId: 'updates:' + doc.id, start: 0, rows: 50, sort: 'oldest_first' },
+            query: `query threadComments($threadId: String!, $start: Int, $rows: Int, $sort: CommentSortOrder) {
+  thread(id: $threadId) {
+    conversation(start: $start, rows: $rows, sort: $sort) { message __typename }
+    __typename
+  }
+}`
+        }, (err, res) => {
+            let wo = null;
+            if (!err && res && res.status === 200) {
+                try {
+                    const j = JSON.parse(res.responseText);
+                    const conv = (j&&j.data&&j.data.thread&&j.data.thread.conversation) || [];
+                    wo = extractWO(conv.map(c => c.message || ''));
+                } catch(e) {}
+            }
+            _woCache[sid] = wo;
+            cb(wo);
+        });
+    }
+
+    function loadAllWOs(docs) {
+        if (!docs || !docs.length) return;
+        let idx = 0;
+        function next() {
+            if (idx >= docs.length) return;
+            const doc = docs[idx++];
+            if (_woCache[doc.shortId] !== undefined) {
+                const c = document.getElementById('wo-' + doc.shortId);
+                if (c) renderWOCell(c, _woCache[doc.shortId]);
+                next();
+                return;
+            }
+            fetchWOForDoc(doc, (wo) => {
+                const c = document.getElementById('wo-' + doc.shortId);
+                if (c) renderWOCell(c, wo);
+                setTimeout(next, 120);
+            });
+        }
+        next();
+    }
+
+    function renderWOCell(cell, wo) {
+        cell.innerHTML = '';
+        if (wo) {
+            const a = document.createElement('a');
+            a.href = EAM_WO_URL + wo;
+            a.target = '_blank';
+            a.textContent = wo;
+            a.style.cssText = 'color:#00b8d8;font-weight:bold;font-size:10px;white-space:nowrap;text-decoration:none;';
+            a.title = 'WO ' + wo + ' in EAM';
+            a.addEventListener('click', e => e.stopPropagation());
+            cell.appendChild(a);
+        } else {
+            const s = document.createElement('span');
+            s.style.cssText = 'color:#bbb;font-size:10px;';
+            s.textContent = '\u2014';
+            cell.appendChild(s);
+        }
+    }
+
+    // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
+
+    function errBox(html) {
+        return `<div style="background:#fff3f3;border:1px solid #f5c2c2;border-radius:4px;padding:10px 14px;color:#c00;font-size:11px;line-height:1.5;">${html}</div>`;
+    }
+
+    function getKpiBody() {
+        return document.querySelector('[id*="bsstrt_kpis"][id$="-body"]');
+    }
+
+    // ── Ticket-Liste laden ────────────────────────────────────────────────────────
+
+    setInterval(() => {
+        const kb = getKpiBody();
+        if (!kb) {
+            const old = document.getElementById(PANEL_ID);
+            if (old) old.remove();
+            _loading = false;
+            return;
+        }
+        if (!document.getElementById(PANEL_ID)) {
+            injectPanel(kb, _lastData);
+            if (!_loading) loadTickets();
+            return;
+        }
+        if (!_loading && Date.now() - _lastRefresh > REFRESH_MS) loadTickets();
+    }, 1000);
+
+    function loadTickets() {
+        _loading = true;
+        _lastRefresh = Date.now();
+        updateStatus('Lädt...');
+        gqlPost(makeListBody(_activeFilter), function(err, res) {
+            _loading = false;
+            if (err) { updateStatus('Netzwerkfehler'); return; }
+            try {
+                const json = JSON.parse(res.responseText);
+                if (!json||!json.data||!json.data.queryIssues) {
+                    updateStatus('Fehler');
+                    const body = document.getElementById('sim-body');
+                    if (body) body.innerHTML = `<div style="padding:8px;color:#c00;font-size:10px;word-break:break-all;">HTTP ${res.status} — ${JSON.stringify(json).substring(0,200)}</div>`;
+                    return;
+                }
+                const docs = json.data.queryIssues.documents;
+                _lastData = { docs, total: json.data.queryIssues.total };
+                const kb = getKpiBody();
+                if (kb) injectPanel(kb, _lastData);
+            } catch(e) {
+                updateStatus('Parse-Fehler');
+            }
+        });
+    }
+
+    function injectPanel(kb, data) {
+        let panel = document.getElementById(PANEL_ID);
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = PANEL_ID;
+            panel.style.cssText = 'margin:0;font-family:Arial,sans-serif;font-size:12px;';
+            const kv = kb.querySelector('.x-dataview');
+            if (kv) kv.style.display = 'none';
+            kb.style.overflow = 'auto';
+            kb.insertBefore(panel, kb.firstChild);
+        }
+
+        const now   = new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+        const total = data ? data.total : '?';
+
+        const tabStyle = (key) =>
+            _activeFilter === key
+                ? 'padding:4px 12px;font-size:11px;font-weight:bold;cursor:pointer;border:none;border-bottom:2px solid #ff9900;background:transparent;color:#fff;user-select:none;'
+                : 'padding:4px 12px;font-size:11px;font-weight:bold;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#888;user-select:none;';
+
+        panel.innerHTML =
+            `<div style="background:#232f3e;padding:5px 10px 0 10px;display:flex;align-items:center;justify-content:space-between;">` +
+            `<div style="display:flex;align-items:flex-end;gap:0;">` +
+            `<button id="sim-tab-ar" style="${tabStyle('ar')}">${FILTERS.ar.label}&nbsp;<span class="sim-star" data-filter="ar" title="Als Standard merken" style="opacity:${_defaultFilter==='ar'?'1':'0.3'};cursor:pointer;font-size:10px;">★</span></button>` +
+            `<button id="sim-tab-all" style="${tabStyle('all')}">${FILTERS.all.label}&nbsp;<span class="sim-star" data-filter="all" title="Als Standard merken" style="opacity:${_defaultFilter==='all'?'1':'0.3'};cursor:pointer;font-size:10px;">★</span></button>` +
+            `<span id="sim-total-badge" style="margin-left:8px;background:#ff9900;color:#000;border-radius:10px;padding:1px 7px;font-size:11px;align-self:center;">${total}</span>` +
+            `</div>` +
+            `<span style="font-size:10px;color:#aaa;display:flex;align-items:center;gap:8px;padding-bottom:4px;">` +
+            `<span id="sim-status-txt">${now}</span>` +
+            `<span id="sim-refresh-btn" title="Neu laden" style="color:#ff9900;cursor:pointer;font-size:16px;user-select:none;">&#8635;</span>` +
+            `<a href="https://t.corp.amazon.com" target="_blank" style="color:#ff9900;font-size:13px;text-decoration:none;">&#10138;</a>` +
+            `</span></div>` +
+            `<div id="sim-body">${data ? buildTable(data.docs) : '<div style="padding:10px;color:#999;text-align:center;">Lade Tickets...</div>'}</div>`;
+
+        document.getElementById('sim-refresh-btn').addEventListener('click', () => {
+            if (!_loading) loadTickets();
+        });
+        document.getElementById('sim-tab-ar').addEventListener('click', e => {
+            if (e.target.classList.contains('sim-star')) return;
+            if (_activeFilter === 'ar' || _loading) return;
+            _activeFilter = 'ar'; _lastData = null; loadTickets();
+        });
+        document.getElementById('sim-tab-all').addEventListener('click', e => {
+            if (e.target.classList.contains('sim-star')) return;
+            if (_activeFilter === 'all' || _loading) return;
+            _activeFilter = 'all'; _lastData = null; loadTickets();
+        });
+        // Stern-Klick = Standardfilter setzen
+        panel.querySelectorAll('.sim-star').forEach(star => {
+            star.addEventListener('click', e => {
+                e.stopPropagation();
+                _defaultFilter = star.dataset.filter;
+                localStorage.setItem('sim_default_filter', _defaultFilter);
+                // Sterne neu rendern
+                panel.querySelectorAll('.sim-star').forEach(s => {
+                    s.style.opacity = s.dataset.filter === _defaultFilter ? '1' : '0.3';
+                });
+            });
+        });
+
+        if (data) {
+            panel.querySelectorAll('tr[data-shortid]').forEach(tr => {
+                tr.style.cursor = 'pointer';
+                tr.addEventListener('dblclick', () => {
+                    openCommOverlay(tr.dataset.shortid, tr.dataset.title || '');
+                });
+            });
+            loadAllWOs(data.docs);
+            // Template-Buttons in der Ticketliste → Overlay öffnen + Text einfügen
+            panel.querySelectorAll('.sim-tpl-row-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const tr = btn.closest('tr');
+                    if (!tr) return;
+                    const shortId = tr.dataset.shortid;
+                    const title   = tr.dataset.title || '';
+                    const text    = btn.dataset.tpl === 'empfang'
+                        ? 'Hello,\nthe RME team has received your ticket and will process your request as soon as possible.\nBest regards.'
+                        : getResponseTextFromTitle(title);
+                    openCommOverlay(shortId, title);
+                    setTimeout(() => {
+                        const co = document.getElementById('sim-tab-co');
+                        if (co) co.click();
+                        const ta = document.getElementById('sim-reply-text');
+                        if (ta) { ta.value = text; ta.focus(); }
+                    }, 60);
+                });
+            });
+            // Assign-to-Me buttons in ticket list
+            panel.querySelectorAll('.sim-atm-btn').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const tr = btn.closest('tr');
+                    const issueId = tr && tr.dataset.issueid;
+                    const identity = getMyIdentity();
+                    if (!issueId || !identity) return;
+                    btn.disabled = true; btn.textContent = '…';
+                    gqlPost({
+                        operationName: 'assignIssue',
+                        variables: { issueId, assignee: identity },
+                        query: `mutation assignIssue($issueId: String!, $assignee: String!) { assignIssue(issueId: $issueId, assignee: $assignee) { id __typename } }`
+                    }, (err, res) => {
+                        btn.disabled = false;
+                        let ok = false;
+                        try { const j = JSON.parse(res.responseText); ok = !!(j && j.data && j.data.assignIssue && !(j.errors && j.errors.length)); } catch(e2) {}
+                        if (ok) {
+                            btn.textContent = '✓'; btn.style.color = '#2e7d32'; btn.style.borderColor = '#2e7d32';
+                            setTimeout(() => { btn.textContent = '👤'; btn.style.color = ''; btn.style.borderColor = ''; btn.disabled = false; }, 1800);
+                            setTimeout(loadTickets, 1200);
+                        } else {
+                            btn.textContent = '✗'; btn.style.color = '#c00'; btn.style.borderColor = '#c00';
+                            setTimeout(() => { btn.textContent = '👤'; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+                        }
+                    });
+                });
+            });
+        }
+    }
+
+    function updateStatus(msg) {
+        const el = document.getElementById('sim-status-txt');
+        if (el) el.textContent = msg;
+    }
+
+    function buildTable(docs) {
+        if (!docs || !docs.length)
+            return '<div style="padding:8px;color:#999;text-align:center;">Keine offenen Tickets</div>';
+
+        const ST_C = {
+            'Assigned':         {bg:'#fff3cd',fg:'#856404',label:'Assigned'},
+            'Work In Progress': {bg:'#cfe2ff',fg:'#084298',label:'WiP'},
+            'Researching':      {bg:'#e2d9f3',fg:'#432874',label:'Research'},
+            'Pending':          {bg:'#e9ecef',fg:'#495057',label:'Pending'},
+        };
+
+        let html = `<div style="overflow-y:auto;max-height:400px;">
+<table style="width:100%;border-collapse:collapse;font-size:11px;">
+<thead><tr style="background:#f0f0f0;border-bottom:2px solid #ddd;">
+  <th style="padding:4px 6px;text-align:center;width:22px;">S</th>
+  <th style="padding:4px 6px;text-align:left;width:80px;">ID</th>
+  <th style="padding:4px 6px;text-align:left;width:90px;">WO</th>
+  <th style="padding:4px 6px;text-align:left;">Titel</th>
+  <th style="padding:4px 6px;text-align:center;width:65px;">Status</th>
+  <th style="padding:4px 6px;text-align:center;width:38px;" title="Vorlagen"></th>
+  <th style="padding:4px 6px;text-align:center;width:20px;" title="Assign to Me"></th>
+  <th style="padding:4px 6px;text-align:left;width:75px;">Assignee</th>
+  <th style="padding:4px 6px;text-align:center;width:50px;">Datum</th>
+</tr></thead><tbody>`;
+
+        docs.forEach(d => {
+            const sevC    = SEV_C[sevKey(d.severity)] || '#888';
+            const stCfg   = ST_C[d.status] || {bg:'#eee',fg:'#333',label:d.status||'?'};
+            const tf      = d.title || '';
+            const td      = tf.replace(/</g,'&lt;').substring(0, 55) + (tf.length > 55 ? '…' : '');
+            const ta      = tf.replace(/"/g,'&quot;').replace(/</g,'&lt;');
+            const assignee = (d.assignee&&d.assignee.name || '—').split(' ')[0];
+            const created  = d.createDate
+                ? new Date(d.createDate).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})
+                : '—';
+            const url = `https://t.corp.amazon.com/issues/${d.shortId}`;
+
+            html += `<tr data-shortid="${d.shortId}" data-issueid="${d.id}" data-title="${ta}"
+  style="border-bottom:1px solid #f0f0f0;"
+  onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+  <td style="padding:3px 6px;text-align:center;">
+    <span style="background:${sevC};color:#fff;border-radius:3px;padding:1px 4px;font-weight:bold;font-size:10px;">${sevKey(d.severity)||'?'}</span>
+  </td>
+  <td style="padding:3px 6px;">
+    <a href="${url}" target="_blank" style="color:#0066cc;text-decoration:none;font-weight:bold;">${d.shortId||'?'}</a>
+  </td>
+  <td id="wo-${d.shortId}" style="padding:3px 6px;"><span style="color:#aaa;font-size:10px;">&#8987;</span></td>
+  <td style="padding:3px 6px;color:#222;" title="${ta}">${td}</td>
+  <td style="padding:3px 6px;text-align:center;">
+    <span style="background:${stCfg.bg};color:${stCfg.fg};border-radius:3px;padding:1px 4px;font-size:10px;white-space:nowrap;">${stCfg.label}</span>
+  </td>
+  <td style="padding:3px 6px;text-align:center;white-space:nowrap;">
+    <button class="sim-tpl-row-btn" data-tpl="empfang" style="font-size:11px;padding:0 3px;border:1px solid #bbb;border-radius:3px;background:#f5f5f5;cursor:pointer;line-height:16px;" title="Empfang einfügen">📩</button><button class="sim-tpl-row-btn" data-tpl="loesung" style="font-size:11px;padding:0 3px;border:1px solid #bbb;border-radius:3px;background:#f5f5f5;cursor:pointer;line-height:16px;margin-left:2px;" title="Lösung einfügen">✅</button>
+  </td>
+  <td style="padding:3px 6px;text-align:center;">
+    <button class="sim-atm-btn" style="font-size:11px;padding:0 3px;border:1px solid #bbb;border-radius:3px;background:#f5f5f5;cursor:pointer;line-height:16px;" title="Assign to Me">👤</button>
+  </td>
+  <td style="padding:3px 6px;color:#555;overflow:hidden;max-width:75px;text-overflow:ellipsis;white-space:nowrap;">${assignee}</td>
+  <td style="padding:3px 6px;text-align:center;color:#888;">${created}</td>
+</tr>`;
+        });
+
+        html += `</tbody></table></div>
+<div style="padding:3px 10px;font-size:10px;color:#999;text-align:center;">
+  Doppelklick = Kommentare &nbsp;|&nbsp; Klick auf ID = SIM &nbsp;|&nbsp; WO = EAM
+</div>`;
+        return html;
+    }
+
+})();
