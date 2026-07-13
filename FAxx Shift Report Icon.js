@@ -1,10 +1,7 @@
 (function () {
     'use strict';
 
-    // Nur im Top-Level-Fenster ausführen (nicht in EAM-iframes)
     if (window !== window.top) return;
-
-    // Singleton — verhindert doppelten Start bei URL-Redirect oder Script-Re-Injektion
     if (window._fa73FloatInit) return;
     window._fa73FloatInit = true;
 
@@ -28,7 +25,6 @@
     let _lastRefresh = 0;
     let _lastRows = null;
 
-    // ─── State ────────────────────────────────────────────────────────────────
     function getState() {
         try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch(e) { return {}; }
     }
@@ -36,7 +32,16 @@
         try { localStorage.setItem(STATE_KEY, JSON.stringify(o)); } catch(e) {}
     }
 
-    // ─── Sterne ────────────────────────────────────────────────────────────────────────
+    // Nachtschicht endet ~06:45 — vor 07:00 gilt das gestrige Datum
+    function getShiftDate() {
+        const now = new Date();
+        if (now.getHours() < 7) {
+            const d = new Date(now); d.setDate(d.getDate() - 1);
+            return d.toDateString();
+        }
+        return now.toDateString();
+    }
+
     function getStars() {
         try {
             const a = JSON.parse(localStorage.getItem(STARS_KEY) || 'null');
@@ -48,20 +53,18 @@
         try { localStorage.setItem(STARS_KEY, JSON.stringify([...s])); } catch(e) {}
     }
 
-    // ─── Cache ────────────────────────────────────────────────────────────────
     function getCached() {
         try {
             const o = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            if (!o || o.date !== new Date().toDateString()) return null;
+            if (!o || o.date !== getShiftDate()) return null;
             if (o.ts && Date.now() - o.ts > 30 * 60 * 1000) return null;
             return o.rows;
         } catch(e) { return null; }
     }
     function saveCache(rows) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ date: new Date().toDateString(), ts: Date.now(), rows })); } catch(e) {}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ date: getShiftDate(), ts: Date.now(), rows })); } catch(e) {}
     }
 
-    // ─── Login-Map ────────────────────────────────────────────────────────────
     function getShiftLoginMap() {
         const map = {};
         try {
@@ -78,7 +81,6 @@
         return map;
     }
 
-    // ─── Daten laden (identisch v4.4) ─────────────────────────────────────────
     function loadShiftData() {
         return new Promise((resolve, reject) => {
             let done = false, wrapDiv = null;
@@ -106,7 +108,8 @@
                 let iframeTries = 0;
                 const waitIframe = setInterval(() => {
                     if (++iframeTries > 40) { clearInterval(waitIframe); finish(new Error('iframe timeout')); return; }
-                    const iframeEl = document.getElementById(comp.id + '-iframeEl') || document.querySelector('iframe');
+                    const iframeEl = document.getElementById(comp.id + '-iframeEl');
+                    if (!iframeEl) return;
                     const iExt = iframeEl?.contentWindow?.Ext;
                     if (!iExt?.StoreManager) return;
                     clearInterval(waitIframe);
@@ -199,10 +202,16 @@
                         const d = item.data;
                         const login = d.xsd_shp_person || d.xsd_person || d.xsd_employee || gridLogins[i] || EAM_ORDER[i] || '';
                         const info = lm[login] || {};
+                        const booked = d.xsd_booked_labor_shift
+                            || (d.xsd_hours_billable_n || d.xsd_hours_billable_o
+                                ? String(parseFloat(d.xsd_hours_billable_n||0) + parseFloat(d.xsd_hours_billable_o||0) || '')
+                                : '');
                         return {
                             person: login, hl: info.hl || false, trade: d.xsd_csm_trade || '',
-                            booked: d.xsd_booked_labor_shift || '', billable: d.xsd_hours_billable_n || '',
-                            nonbill: d.xsd_hours_nonbillable || '', avail: d.xsd_hours_avail || '',
+                            booked: booked,
+                            billable: d.xsd_hours_billable_n || '',
+                            nonbill: d.xsd_hours_nonbillable || d.xsd_hours_billable_o || '',
+                            avail: d.xsd_hours_avail || '',
                             status: d.xsd_exc_comment || ''
                         };
                     }));
@@ -224,7 +233,6 @@
         });
     }
 
-    // ─── Refresh ──────────────────────────────────────────────────────────────
     function triggerRefresh() {
         _loading = true; _lastRefresh = Date.now();
         setStatus('loading');
@@ -234,14 +242,13 @@
             .finally(() => { _loading = false; });
     }
 
-    // ─── UI ───────────────────────────────────────────────────────────────────
     let floatEl = null;
 
     function buildUI() {
         if (document.getElementById('fa73-float-root')) return;
 
         const st = getState();
-        const open = st.open !== false; // default offen
+        const open = st.open !== false;
         const x = st.x ?? null;
         const y = st.y ?? null;
 
@@ -256,7 +263,6 @@
             ${x !== null ? `left:${x}px;top:${y}px;` : 'right:18px;bottom:18px;'}
         `;
 
-        // Mini-Button (immer sichtbar)
         const fab = document.createElement('div');
         fab.id = 'fa73-fab';
         fab.style.cssText = `
@@ -277,7 +283,6 @@
         fab.innerHTML = 'FA73 <span id="fa73-status-dot" style="width:8px;height:8px;border-radius:50%;background:#aaa;display:inline-block;"></span>';
         fab.title = 'FA73 Shift Report öffnen';
 
-        // Panel
         const panel = document.createElement('div');
         panel.id = 'fa73-float-panel';
         floatEl = panel;
@@ -293,7 +298,6 @@
             margin-bottom: 8px;
         `;
 
-        // Header (drag handle)
         const header = document.createElement('div');
         header.style.cssText = `
             background: #232f3e;
@@ -314,7 +318,6 @@
             </span>
         `;
 
-        // Body
         const body = document.createElement('div');
         body.id = 'fa73-float-body';
         body.style.cssText = 'overflow-y:auto;flex:1;';
@@ -326,7 +329,6 @@
         root.appendChild(fab);
         document.body.appendChild(root);
 
-        // Stern-Toggle via Event-Delegation
         body.addEventListener('click', e => {
             const star = e.target.closest('.fa73-star');
             if (!star) return;
@@ -338,7 +340,6 @@
             if (_lastRows) renderTable(_lastRows);
         });
 
-        // ── Drag ──────────────────────────────────────────────────────────────
         let dragging = false, dragged = false, dragOffX = 0, dragOffY = 0;
 
         function startDrag(e) {
@@ -354,7 +355,6 @@
             startDrag(e);
         });
 
-        // FAB ist auch Drag-Handle wenn Panel geschlossen
         fab.addEventListener('mousedown', e => { startDrag(e); });
 
         document.addEventListener('mousemove', e => {
@@ -367,6 +367,7 @@
             root.style.bottom = 'auto';
             dragged = true;
         });
+
         document.addEventListener('mouseup', () => {
             if (!dragging) return;
             dragging = false;
@@ -376,23 +377,20 @@
             saveState(s);
         });
 
-        // ── Toggle ────────────────────────────────────────────────────────────────────
         fab.addEventListener('click', () => {
-            if (dragged) { dragged = false; return; } // Drag, kein Toggle
+            if (dragged) { dragged = false; return; }
             const nowOpen = panel.style.display !== 'none';
             panel.style.display = nowOpen ? 'none' : 'flex';
             const s = getState(); s.open = !nowOpen; saveState(s);
             if (!nowOpen && !_loading && !getCached()) triggerRefresh();
         });
 
-        // ── Refresh Button ────────────────────────────────────────────────────
         document.getElementById('fa73-float-refresh').addEventListener('click', e => {
             e.stopPropagation();
             _loading = false;
             triggerRefresh();
         });
 
-        // ── Close/Minimize ────────────────────────────────────────────────────
         document.getElementById('fa73-float-close').addEventListener('click', e => {
             e.stopPropagation();
             panel.style.display = 'none';
@@ -464,7 +462,6 @@
         body.innerHTML = html;
     }
 
-    // ─── Auto-Refresh Loop ────────────────────────────────────────────────────
     function init() {
         buildUI();
         const cached = getCached();
@@ -473,10 +470,9 @@
 
         setInterval(() => {
             if (!_loading && Date.now() - _lastRefresh > REFRESH_MS) triggerRefresh();
-        }, 60000); // check every minute
+        }, 60000);
     }
 
-    // Warten bis DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
