@@ -128,13 +128,21 @@
             }
 
             function selectAndLoad(iExt, listStore) {
-                let idx = 0;
+                // Richtigen Shift anhand von eventstartdate + getShiftDate() wählen
+                let idx = 0, bestIdx = -1;
+                const shiftDateStr = getShiftDate();
                 for (let i = 0; i < listStore.getCount(); i++) {
                     const rec = listStore.getAt ? listStore.getAt(i) : (listStore.data?.items?.[i]);
                     if (!rec) continue;
                     const d = rec.data;
-                    if ((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73') { idx = i; break; }
+                    if (!((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73')) continue;
+                    if (bestIdx === -1) bestIdx = i; // erster Match als Fallback
+                    if (d.eventstartdate) {
+                        const startDate = new Date(d.eventstartdate).toDateString();
+                        if (startDate === shiftDateStr) { bestIdx = i; break; }
+                    }
                 }
+                if (bestIdx !== -1) idx = bestIdx;
                 for (const g of iExt.ComponentQuery.query('gridpanel')) {
                     try {
                         const gs = g.getStore?.();
