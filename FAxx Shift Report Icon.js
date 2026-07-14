@@ -5,99 +5,100 @@
     if (window._fa73FloatInit) return;
     window._fa73FloatInit = true;
 
+    // ── Konstanten ──────────────────────────────────────────────────────────
     const SHIFT_DESC  = 'FRA7 Schicht 3';
     const STORE_LIST  = 'EAM.store.operation.casemanagement.cscase_lst_lst';
     const STORE_LABOR = 'EAM.store.operation.casemanagement.cscase_xsd_xsd';
-    const SR_SETTINGS = 'sr-shift-settings-v2';
-    const CACHE_KEY   = 'fa73_float_cache_v1';
-    const STATE_KEY   = 'fa73_float_state_v1';
-    const STARS_KEY   = 'fa73_float_stars_v1';
-    const DEFAULT_STARS = ['kanataza', 'rmalogor', 'hsshimen'];
-    const REFRESH_MS  = 5 * 60 * 1000;
+    const CACHE_KEY   = 'fa73_v2_cache';
+    const STATE_KEY   = 'fa73_v2_state';
+    const STARS_KEY   = 'fa73_v2_stars';
+    const CACHE_TTL   = 30 * 60 * 1000; // 30min
+    const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5min — nur wenn Panel offen
 
-    const EAM_ORDER = [
-        'hsshimen','klikevi','ussaxel','jsonsta','rmalogor','shalsami',
-        'kanataza','kedama','lugejaso','schmidqd','halkenhc','schudack',
-        'sprinoli','ionelvic','ivelik','daldalci',
+    // ── SG3 Team (hardcoded) ─────────────────────────────────────────────────
+    const SG3 = [
+        { login: 'hsshimen', role: 'ASSOC', star: true  },
+        { login: 'ionelvic', role: 'ASSOC', star: false },
+        { login: 'ivelik',   role: 'ASSOC', star: false },
+        { login: 'daldalci', role: 'TECH',  star: false },
+        { login: 'halkenhc', role: 'TECH',  star: false },
+        { login: 'jsonsta',  role: 'TECH',  star: false },
+        { login: 'kanataza', role: 'TECH',  star: true  },
+        { login: 'kedama',   role: 'TECH',  star: false },
+        { login: 'klikevi',  role: 'TECH',  star: false },
+        { login: 'lugejaso', role: 'TECH',  star: false },
+        { login: 'rmalogor', role: 'TECH',  star: true  },
+        { login: 'schmidqd', role: 'TECH',  star: false },
+        { login: 'schudack', role: 'TECH',  star: false },
+        { login: 'shalsami', role: 'TECH',  star: false },
+        { login: 'sprinoli', role: 'TECH',  star: false },
+        { login: 'ussaxel',  role: 'TECH',  star: false },
     ];
 
-    let _loading = false;
-    let _lastRefresh = 0;
-    let _lastRows = null;
+    // EAM-Zeilenreihenfolge im Labor-Grid (Fallback wenn Login-Feld leer)
+    const EAM_ORDER = [
+        'hsshimen', 'ionelvic', 'ivelik',
+        'daldalci', 'halkenhc', 'jsonsta', 'kanataza', 'kedama', 'klikevi',
+        'lugejaso', 'rmalogor', 'schmidqd', 'schudack', 'shalsami', 'sprinoli', 'ussaxel',
+    ];
 
-    function getState() {
-        try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch(e) { return {}; }
-    }
-    function saveState(o) {
-        try { localStorage.setItem(STATE_KEY, JSON.stringify(o)); } catch(e) {}
-    }
+    const SG3_MAP = Object.fromEntries(SG3.map(e => [e.login, e]));
 
-    // Nachtschicht endet ~06:45 — vor 07:00 gilt das gestrige Datum
-    function getShiftDate() {
-        const now = new Date();
-        if (now.getHours() < 7) {
-            const d = new Date(now); d.setDate(d.getDate() - 1);
-            return d.toDateString();
-        }
-        return now.toDateString();
-    }
+    // ── State / Cache / Stars ─────────────────────────────────────────────────
+    let _loading = false, _lastRefresh = 0, _lastRows = null;
+
+    const ls = {
+        get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
+        set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+    };
+
+    function getState()    { return ls.get(STATE_KEY) || {}; }
+    function saveState(o)  { ls.set(STATE_KEY, o); }
 
     function getStars() {
-        try {
-            const a = JSON.parse(localStorage.getItem(STARS_KEY) || 'null');
-            if (Array.isArray(a)) return new Set(a);
-        } catch(e) {}
-        return new Set(DEFAULT_STARS);
+        const a = ls.get(STARS_KEY);
+        return new Set(Array.isArray(a) ? a : SG3.filter(e => e.star).map(e => e.login));
     }
-    function saveStars(s) {
-        try { localStorage.setItem(STARS_KEY, JSON.stringify([...s])); } catch(e) {}
+    function saveStars(s) { ls.set(STARS_KEY, [...s]); }
+
+    function getShiftDate() {
+        const d = new Date();
+        if (d.getHours() < 7) d.setDate(d.getDate() - 1);
+        return d.toDateString();
     }
 
     function getCached() {
-        try {
-            const o = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            if (!o || o.date !== getShiftDate()) return null;
-            if (o.ts && Date.now() - o.ts > 30 * 60 * 1000) return null;
-            return o.rows;
-        } catch(e) { return null; }
+        const o = ls.get(CACHE_KEY);
+        if (!o || o.date !== getShiftDate()) return null;
+        if (Date.now() - o.ts > CACHE_TTL) return null;
+        return o.rows;
     }
     function saveCache(rows) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ date: getShiftDate(), ts: Date.now(), rows })); } catch(e) {}
+        ls.set(CACHE_KEY, { date: getShiftDate(), ts: Date.now(), rows });
     }
 
-    function getShiftLoginMap() {
-        const map = {};
-        try {
-            const s = JSON.parse(localStorage.getItem(SR_SETTINGS) || 'null');
-            if (!s) return map;
-            for (const k of Object.keys(s)) {
-                const sh = s[k];
-                if (sh?.name?.includes(SHIFT_DESC)) {
-                    (sh.entries || []).forEach(e => { map[e.login] = { hl: e.highlight || false }; });
-                    break;
-                }
-            }
-        } catch(e) {}
-        return map;
-    }
-
+    // ── EAM Daten laden ────────────────────────────────────────────────────────
     function loadShiftData() {
         return new Promise((resolve, reject) => {
             let done = false, wrapDiv = null;
-            const timer = setTimeout(() => { if (!done) { done = true; reject('timeout'); } }, 45000);
+            const timer = setTimeout(() => finish(new Error('Timeout')), 45000);
+
             function finish(r) {
                 if (done) return; done = true;
                 clearTimeout(timer);
                 try { if (wrapDiv) wrapDiv.style.display = 'none'; } catch(e) {}
                 r instanceof Error ? reject(r.message) : resolve(r);
             }
+
             let extTries = 0;
             const waitExt = setInterval(() => {
                 if (++extTries > 30) { clearInterval(waitExt); finish(new Error('Ext timeout')); return; }
                 if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return;
                 clearInterval(waitExt);
+
                 const comp = Ext.ComponentQuery.query('uxtabiframe').find(c => c.src?.includes('CSCASE'));
                 if (!comp) { finish(new Error('CSCASE nicht gefunden')); return; }
+
                 comp.hidden = false;
                 if (!comp.rendered) {
                     wrapDiv = document.createElement('div');
@@ -105,6 +106,7 @@
                     document.body.appendChild(wrapDiv);
                     comp.render(wrapDiv);
                 }
+
                 let iframeTries = 0;
                 const waitIframe = setInterval(() => {
                     if (++iframeTries > 40) { clearInterval(waitIframe); finish(new Error('iframe timeout')); return; }
@@ -123,26 +125,24 @@
                     if (++tries > 80) { clearInterval(poll); finish(new Error('Liste timeout')); return; }
                     const ls = iExt.StoreManager.lookup(STORE_LIST);
                     if (!ls || ls.getCount() === 0) return;
-                    clearInterval(poll); selectAndLoad(iExt, ls);
+                    clearInterval(poll);
+                    selectAndLoad(iExt, ls);
                 }, 500);
             }
 
             function selectAndLoad(iExt, listStore) {
-                // Richtigen Shift anhand von eventstartdate + getShiftDate() wählen
-                let idx = 0, bestIdx = -1;
                 const shiftDateStr = getShiftDate();
+                let bestIdx = -1;
                 for (let i = 0; i < listStore.getCount(); i++) {
-                    const rec = listStore.getAt ? listStore.getAt(i) : (listStore.data?.items?.[i]);
+                    const rec = listStore.getAt ? listStore.getAt(i) : listStore.data?.items?.[i];
                     if (!rec) continue;
                     const d = rec.data;
                     if (!((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73')) continue;
-                    if (bestIdx === -1) bestIdx = i; // erster Match als Fallback
-                    if (d.eventstartdate) {
-                        const startDate = new Date(d.eventstartdate).toDateString();
-                        if (startDate === shiftDateStr) { bestIdx = i; break; }
-                    }
+                    if (bestIdx === -1) bestIdx = i;
+                    if (d.eventstartdate && new Date(d.eventstartdate).toDateString() === shiftDateStr) { bestIdx = i; break; }
                 }
-                if (bestIdx !== -1) idx = bestIdx;
+                const idx = bestIdx !== -1 ? bestIdx : 0;
+
                 for (const g of iExt.ComponentQuery.query('gridpanel')) {
                     try {
                         const gs = g.getStore?.();
@@ -151,19 +151,20 @@
                         }
                     } catch(e) {}
                 }
+
                 const oldLs = iExt.StoreManager.lookup(STORE_LABOR);
                 if (oldLs) try { oldLs.removeAll(); } catch(e) {}
+
                 setTimeout(() => {
                     try {
                         for (const tp of iExt.ComponentQuery.query('uxtabpanel')) {
                             const items = tp.items?.items || [];
                             const lt = items.find(t => t.title === 'Labor');
-                            if (lt) {
-                                const rt = items.find(t => t.title === 'Record View');
-                                try { if (rt) tp.setActiveTab(rt); } catch(e) {}
-                                setTimeout(() => { try { tp.setActiveTab(lt); } catch(e) {} }, 300);
-                                break;
-                            }
+                            if (!lt) continue;
+                            const rt = items.find(t => t.title === 'Record View');
+                            try { if (rt) tp.setActiveTab(rt); } catch(e) {}
+                            setTimeout(() => { try { tp.setActiveTab(lt); } catch(e) {} }, 300);
+                            break;
                         }
                     } catch(e) {}
                     waitForLabor(iExt);
@@ -172,58 +173,46 @@
 
             function waitForLabor(iExt) {
                 let resolved = false;
+
                 function getGridLogins() {
                     try {
                         for (const g of iExt.ComponentQuery.query('gridpanel')) {
-                            const gst = g.getStore && g.getStore();
+                            const gst = g.getStore?.();
                             if (!gst || (gst.storeId || gst.id || '') !== STORE_LABOR) continue;
-                            const view = g.getView && g.getView();
-                            if (!view || !view.el || !view.el.dom) continue;
+                            const view = g.getView?.();
+                            if (!view?.el?.dom) continue;
                             const rows = view.el.dom.querySelectorAll('.x-grid-row');
-                            const result = Array.from(rows).map(r => {
-                                const c = r.querySelector('.x-grid-cell-inner');
-                                return c ? c.textContent.trim().toLowerCase() : '';
-                            }).filter(Boolean);
-                            if (result.length > 0) return result;
-                        }
-                    } catch(e) {}
-                    try {
-                        const iframeEl = document.querySelector('iframe[id*="uxtabiframe"]');
-                        if (iframeEl?.contentDocument) {
-                            const rows = iframeEl.contentDocument.querySelectorAll('.x-grid-row');
-                            if (rows.length > 0) {
-                                const result = Array.from(rows).map(r => {
-                                    const c = r.querySelector('.x-grid-cell-inner');
-                                    return c ? c.textContent.trim().toLowerCase() : '';
-                                }).filter(v => v && v.length >= 4 && v.length <= 15 && !/\s|[^a-z0-9]/.test(v));
-                                if (result.length > 0) return result;
-                            }
+                            const result = [...rows].map(r => r.querySelector('.x-grid-cell-inner')?.textContent?.trim()?.toLowerCase() || '').filter(Boolean);
+                            if (result.length) return result;
                         }
                     } catch(e) {}
                     return [];
                 }
-                function process(ls) {
+
+                function process(store) {
                     if (resolved) return; resolved = true;
-                    const lm = getShiftLoginMap();
                     const gridLogins = getGridLogins();
-                    finish((ls.getRange ? ls.getRange() : (ls.data&&ls.data.items||[])).map((item, i) => {
+                    const items = store.getRange ? store.getRange() : (store.data?.items || []);
+                    const rows = items.map((item, i) => {
                         const d = item.data;
                         const login = d.xsd_shp_person || d.xsd_person || d.xsd_employee || gridLogins[i] || EAM_ORDER[i] || '';
-                        const info = lm[login] || {};
                         const booked = d.xsd_booked_labor_shift
                             || (d.xsd_hours_billable_n || d.xsd_hours_billable_o
-                                ? String(parseFloat(d.xsd_hours_billable_n||0) + parseFloat(d.xsd_hours_billable_o||0) || '')
+                                ? String(parseFloat(d.xsd_hours_billable_n || 0) + parseFloat(d.xsd_hours_billable_o || 0) || '')
                                 : '');
                         return {
-                            person: login, hl: info.hl || false, trade: d.xsd_csm_trade || '',
-                            booked: booked,
+                            login,
+                            trade:   d.xsd_csm_trade || '',
+                            booked,
                             billable: d.xsd_hours_billable_n || '',
-                            nonbill: d.xsd_hours_nonbillable || d.xsd_hours_billable_o || '',
-                            avail: d.xsd_hours_avail || '',
-                            status: d.xsd_exc_comment || ''
+                            nonbill:  d.xsd_hours_nonbillable || d.xsd_hours_billable_o || '',
+                            avail:    d.xsd_hours_avail || '',
+                            status:   d.xsd_exc_comment || '',
                         };
-                    }));
+                    });
+                    finish(rows);
                 }
+
                 iExt.StoreManager.on('add', function onAdd(mgr, store) {
                     if ((store.storeId || store.id) === STORE_LABOR) {
                         iExt.StoreManager.un('add', onAdd);
@@ -233,258 +222,306 @@
                 let tries = 0;
                 const poll = setInterval(() => {
                     if (++tries > 50) { clearInterval(poll); if (!resolved) finish(new Error('Labor timeout')); return; }
-                    const ls = iExt.StoreManager.lookup(STORE_LABOR);
-                    if (!ls || ls.getCount() === 0) return;
-                    clearInterval(poll); setTimeout(() => process(ls), 500);
+                    const store = iExt.StoreManager.lookup(STORE_LABOR);
+                    if (!store || store.getCount() === 0) return;
+                    clearInterval(poll);
+                    setTimeout(() => process(store), 500);
                 }, 400);
             }
         });
     }
 
+    // ── Refresh ────────────────────────────────────────────────────────────────
     function triggerRefresh() {
-        _loading = true; _lastRefresh = Date.now();
-        setStatus('loading');
+        if (_loading) return;
+        _loading = true;
+        _lastRefresh = Date.now();
+        setDot('loading');
         loadShiftData()
-            .then(rows => { saveCache(rows); renderTable(rows); setStatus('ok'); })
-            .catch(e => { console.warn('[FA73-Float]', e); setStatus('error'); })
+            .then(rows => { saveCache(rows); renderTable(rows); setDot('ok'); })
+            .catch(e  => { console.warn('[FA73v2]', e); setDot('error'); })
             .finally(() => { _loading = false; });
     }
 
-    let floatEl = null;
-
+    // ── UI ─────────────────────────────────────────────────────────────────────
     function buildUI() {
-        if (document.getElementById('fa73-float-root')) return;
+        if (document.getElementById('fa73v2-root')) return;
 
         const st = getState();
         const open = st.open !== false;
-        const x = st.x ?? null;
-        const y = st.y ?? null;
 
         const root = document.createElement('div');
-        root.id = 'fa73-float-root';
-        root.style.cssText = `
-            position: fixed;
-            z-index: 999999;
-            font-family: Arial, sans-serif;
-            font-size: 11px;
-            user-select: none;
-            ${x !== null ? `left:${x}px;top:${y}px;` : 'right:18px;bottom:18px;'}
-        `;
+        root.id = 'fa73v2-root';
+        Object.assign(root.style, {
+            position: 'fixed', zIndex: '999999',
+            fontFamily: 'Arial,sans-serif', fontSize: '11px',
+            userSelect: 'none',
+            ...(st.x != null ? { left: st.x + 'px', top: st.y + 'px' } : { right: '18px', bottom: '18px' })
+        });
 
-        const fab = document.createElement('div');
-        fab.id = 'fa73-fab';
-        fab.style.cssText = `
-            background: #232f3e;
-            color: #fff;
-            padding: 6px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            transition: background 0.15s;
-            white-space: nowrap;
-        `;
-        fab.innerHTML = 'FA73 <span id="fa73-status-dot" style="width:8px;height:8px;border-radius:50%;background:#aaa;display:inline-block;"></span>';
-        fab.title = 'FA73 Shift Report öffnen';
-
+        // Panel
         const panel = document.createElement('div');
-        panel.id = 'fa73-float-panel';
-        floatEl = panel;
-        panel.style.cssText = `
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
-            width: 620px;
-            max-height: 500px;
-            display: ${open ? 'flex' : 'none'};
-            flex-direction: column;
-            overflow: hidden;
-            margin-bottom: 8px;
-        `;
+        panel.id = 'fa73v2-panel';
+        const savedW = st.width  ?? 560;
+        const savedH = st.height ?? 520;
+        Object.assign(panel.style, {
+            background: '#1a2332', borderRadius: '8px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+            width: savedW + 'px', height: savedH + 'px',
+            minWidth: '300px', minHeight: '120px', maxHeight: '90vh',
+            display: open ? 'flex' : 'none',
+            flexDirection: 'column', overflow: 'hidden',
+            marginBottom: '8px', border: '1px solid #2d3f55',
+            position: 'relative',
+        });
 
-        const header = document.createElement('div');
-        header.style.cssText = `
-            background: #232f3e;
-            color: #fff;
-            padding: 7px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            cursor: move;
-            flex-shrink: 0;
-        `;
-        header.innerHTML = `
-            <span style="font-weight:bold;font-size:12px;">FA73 Shift Report</span>
-            <span style="display:flex;align-items:center;gap:8px;font-size:11px;color:#aaa;">
-                <span id="fa73-float-time"></span>
-                <span id="fa73-float-refresh" title="Refresh" style="color:#ff9900;cursor:pointer;font-size:16px;line-height:1;">&#8635;</span>
-                <span id="fa73-float-close" title="Minimieren" style="color:#aaa;cursor:pointer;font-size:14px;line-height:1;">&#8722;</span>
-            </span>
-        `;
+        // Corner resize grip — oben rechts
+        const grip = document.createElement('div');
+        grip.id = 'fa73v2-grip';
+        Object.assign(grip.style, {
+            position: 'absolute', top: '0', right: '0',
+            width: '18px', height: '18px',
+            cursor: 'nesw-resize', zIndex: '10',
+            borderRadius: '0 8px 0 0',
+        });
+        // Kleine Striche wie echtes Resize-Symbol
+        // kein visuelles symbol — nur cursor ändert sich beim hovern
+        panel.appendChild(grip);
 
+        // Header
+        const hdr = document.createElement('div');
+        hdr.id = 'fa73v2-header';
+        Object.assign(hdr.style, {
+            background: '#0f1923', color: '#e8edf2',
+            padding: '8px 12px', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between',
+            cursor: 'move', flexShrink: '0',
+            borderBottom: '1px solid #2d3f55'
+        });
+        hdr.innerHTML = `
+            <span style="font-weight:bold;font-size:12px;letter-spacing:.5px;">FA73 Shift Report</span>
+            <span style="display:flex;align-items:center;gap:10px;font-size:11px;color:#7a9ab8;">
+                <span id="fa73v2-time"></span>
+                <span id="fa73v2-btn-refresh" title="Refresh" style="color:#ff9900;cursor:pointer;font-size:17px;line-height:1;transition:transform .3s;">⟳</span>
+                <span id="fa73v2-btn-close" title="Minimieren" style="color:#7a9ab8;cursor:pointer;font-size:16px;line-height:1;">−</span>
+            </span>`;
+
+        // Body
         const body = document.createElement('div');
-        body.id = 'fa73-float-body';
-        body.style.cssText = 'overflow-y:auto;flex:1;';
-        body.innerHTML = '<div style="padding:16px;text-align:center;color:#999;">Lade FA73...</div>';
+        body.id = 'fa73v2-body';
+        Object.assign(body.style, { overflowY: 'auto', flex: '1' });
+        body.innerHTML = `<div style="padding:20px;text-align:center;color:#4a6a88;">Klick ⟳ zum Laden</div>`;
 
-        panel.appendChild(header);
+        panel.appendChild(hdr);
         panel.appendChild(body);
+
+        // FAB
+        const fab = document.createElement('div');
+        fab.id = 'fa73v2-fab';
+        Object.assign(fab.style, {
+            background: '#0f1923', color: '#e8edf2',
+            padding: '6px 14px', borderRadius: '20px',
+            cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+            display: 'flex', alignItems: 'center', gap: '7px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+            border: '1px solid #2d3f55', whiteSpace: 'nowrap'
+        });
+        fab.innerHTML = `FA73 <span id="fa73v2-dot" style="width:8px;height:8px;border-radius:50%;background:#4a6a88;display:inline-block;"></span>`;
+
         root.appendChild(panel);
         root.appendChild(fab);
         document.body.appendChild(root);
 
+        // Star click
         body.addEventListener('click', e => {
-            const star = e.target.closest('.fa73-star');
-            if (!star) return;
+            const btn = e.target.closest('.fa73v2-star');
+            if (!btn) return;
             e.stopPropagation();
-            const login = star.dataset.login;
             const s = getStars();
-            if (s.has(login)) s.delete(login); else s.add(login);
+            const login = btn.dataset.login;
+            s.has(login) ? s.delete(login) : s.add(login);
             saveStars(s);
             if (_lastRows) renderTable(_lastRows);
         });
 
-        let dragging = false, dragged = false, dragOffX = 0, dragOffY = 0;
-
+        // Drag
+        let dragging = false, dragged = false, ox = 0, oy = 0;
         function startDrag(e) {
             dragging = true; dragged = false;
-            const rect = root.getBoundingClientRect();
-            dragOffX = e.clientX - rect.left;
-            dragOffY = e.clientY - rect.top;
+            const r = root.getBoundingClientRect();
+            ox = e.clientX - r.left; oy = e.clientY - r.top;
             e.preventDefault();
         }
-
-        header.addEventListener('mousedown', e => {
-            if (e.target.id === 'fa73-float-refresh' || e.target.id === 'fa73-float-close') return;
+        hdr.addEventListener('mousedown', e => {
+            if (['fa73v2-btn-refresh','fa73v2-btn-close'].includes(e.target.id)) return;
             startDrag(e);
         });
-
-        fab.addEventListener('mousedown', e => { startDrag(e); });
-
+        fab.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', e => {
             if (!dragging) return;
-            const nx = Math.max(0, Math.min(window.innerWidth - root.offsetWidth, e.clientX - dragOffX));
-            const ny = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, e.clientY - dragOffY));
-            root.style.left = nx + 'px';
-            root.style.top  = ny + 'px';
-            root.style.right = 'auto';
-            root.style.bottom = 'auto';
             dragged = true;
+            root.style.left   = Math.max(0, Math.min(window.innerWidth  - root.offsetWidth,  e.clientX - ox)) + 'px';
+            root.style.top    = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, e.clientY - oy)) + 'px';
+            root.style.right  = 'auto';
+            root.style.bottom = 'auto';
+        });
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return; dragging = false;
+            const r = root.getBoundingClientRect();
+            const s = getState(); s.x = Math.round(r.left); s.y = Math.round(r.top); saveState(s);
         });
 
+        // Diagonal-Resize (oben rechts)
+        let _resizing = false, _rsX = 0, _rsY = 0, _rsW = 0, _rsH = 0, _rsTop = 0;
+        grip.addEventListener('mousedown', e => {
+            e.preventDefault(); e.stopPropagation();
+            _resizing = true;
+            _rsX = e.clientX; _rsY = e.clientY;
+            _rsW = panel.offsetWidth; _rsH = panel.offsetHeight;
+            _rsTop = root.getBoundingClientRect().top;
+            document.body.style.cursor = 'nesw-resize';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!_resizing) return;
+            const dx = e.clientX - _rsX;
+            const dy = e.clientY - _rsY; // positiv = runter, negativ = hoch
+            const newW = Math.max(300, _rsW + dx);
+            const newH = Math.max(120, _rsH - dy); // hoch = größer
+            panel.style.width  = newW + 'px';
+            panel.style.height = newH + 'px';
+            // Top mitbewegen → bottom-edge bleibt, panel wächst nach oben
+            root.style.top    = Math.max(0, _rsTop + dy) + 'px';
+            root.style.bottom = 'auto';
+        });
         document.addEventListener('mouseup', () => {
-            if (!dragging) return;
-            dragging = false;
-            const rect = root.getBoundingClientRect();
+            if (!_resizing) return; _resizing = false;
+            document.body.style.cursor = '';
+            const r = root.getBoundingClientRect();
             const s = getState();
-            s.x = Math.round(rect.left); s.y = Math.round(rect.top);
+            s.width  = Math.round(panel.offsetWidth);
+            s.height = Math.round(panel.offsetHeight);
+            s.x = Math.round(r.left);
+            s.y = Math.round(r.top);
             saveState(s);
         });
 
+
+        // FAB click — öffnen/schließen, nur laden wenn kein Cache
         fab.addEventListener('click', () => {
             if (dragged) { dragged = false; return; }
-            const nowOpen = panel.style.display !== 'none';
-            panel.style.display = nowOpen ? 'none' : 'flex';
-            const s = getState(); s.open = !nowOpen; saveState(s);
-            if (!nowOpen && !_loading && !getCached()) triggerRefresh();
+            const isOpen = panel.style.display !== 'none';
+            panel.style.display = isOpen ? 'none' : 'flex';
+            const s = getState(); s.open = !isOpen; saveState(s);
+            if (!isOpen && !_loading && !getCached()) triggerRefresh();
         });
 
-        document.getElementById('fa73-float-refresh').addEventListener('click', e => {
+        document.getElementById('fa73v2-btn-refresh').addEventListener('click', e => {
             e.stopPropagation();
             _loading = false;
             triggerRefresh();
         });
-
-        document.getElementById('fa73-float-close').addEventListener('click', e => {
+        document.getElementById('fa73v2-btn-close').addEventListener('click', e => {
             e.stopPropagation();
             panel.style.display = 'none';
             const s = getState(); s.open = false; saveState(s);
         });
     }
 
-    function setStatus(state) {
-        const dot = document.getElementById('fa73-status-dot');
-        const time = document.getElementById('fa73-float-time');
-        if (dot) dot.style.background = state === 'ok' ? '#4caf50' : state === 'loading' ? '#ff9900' : '#f44336';
-        if (time && state !== 'loading') {
-            const now = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-            time.textContent = now;
-        }
+    function setDot(state) {
+        const dot  = document.getElementById('fa73v2-dot');
+        const time = document.getElementById('fa73v2-time');
+        if (dot) dot.style.background =
+            state === 'ok' ? '#4caf50' : state === 'loading' ? '#ff9900' : '#f44336';
+        if (time && state !== 'loading')
+            time.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     }
 
     function renderTable(rows) {
         _lastRows = rows;
-        const body = document.getElementById('fa73-float-body');
+        const body = document.getElementById('fa73v2-body');
         if (!body) return;
-        if (!rows || !rows.length) {
-            body.innerHTML = '<div style="padding:12px;text-align:center;color:#999;">Keine Daten</div>';
+        if (!rows?.length) {
+            body.innerHTML = '<div style="padding:16px;text-align:center;color:#4a6a88;">Keine Daten</div>';
             return;
         }
         const stars = getStars();
         let tB = 0, tBl = 0;
-        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
-            <thead><tr style="background:#f0f0f0;border-bottom:2px solid #ddd;position:sticky;top:0;">
-                <th style="padding:4px 6px;text-align:left;">Login</th>
-                <th style="padding:4px 6px;text-align:left;">Trade</th>
-                <th style="padding:4px 6px;text-align:center;">Ges.</th>
-                <th style="padding:4px 6px;text-align:center;">Bill.</th>
-                <th style="padding:4px 6px;text-align:center;">N-Bill.</th>
-                <th style="padding:4px 6px;text-align:center;">Verf.</th>
-                <th style="padding:4px 6px;text-align:center;">Status</th>
-            </tr></thead><tbody>`;
 
-        rows.forEach(row => {
+        const rowsHtml = rows.map(row => {
             const b  = parseFloat((row.booked   || '0').replace(',', '.')) || 0;
             const bl = parseFloat((row.billable || '0').replace(',', '.')) || 0;
             tB += b; tBl += bl;
-            const hl = stars.has(row.person);
-            const bg = row.status === 'AW' ? '#ffcdd2'
-                     : b === 0             ? '#ffebee'
-                     : bl > b              ? '#fff9c4'
-                     : bl < b              ? '#bbdefb'
-                     : bl === b && b > 0   ? '#c8e6c9' : '#fff';
-            const nc = hl ? 'color:#00bcd4;font-weight:bold;' : '';
-            const st = row.status === 'AW' ? '<span style="background:#c00;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">AW</span>'
-                     : row.status === 'U'  ? '<span style="background:#e65100;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">U</span>'
-                     : row.status          ? `<span style="background:#eee;padding:0 3px;border-radius:2px;">${row.status}</span>` : '';
-            html += `<tr style="background:${bg};border-bottom:1px solid #f0f0f0;">
-                <td style="padding:3px 6px;${nc}"><span class="fa73-star" data-login="${row.person}" style="cursor:pointer;color:${hl ? '#00bcd4' : '#ccc'};margin-right:3px;" title="Stern togglen">★</span>${row.person || '—'}</td>
-                <td style="padding:3px 6px;color:#666;">${row.trade}</td>
-                <td style="padding:3px 6px;text-align:center;font-weight:bold;">${row.booked  || '—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.billable || '—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.nonbill  || '—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.avail    || '—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${st}</td>
+
+            const isStar = stars.has(row.login);
+            const info   = SG3_MAP[row.login] || {};
+
+            // Zeilenfarbe
+            const bg =
+                row.status && row.status !== 'URLAUB' && row.status !== 'U' ? '#3d1a1a' :
+                row.status === 'URLAUB' || row.status === 'U'               ? '#2a1f0f' :
+                b === 0 && !row.status                                       ? '#2a1a1a' :
+                bl > 0 && bl === b                                           ? '#0f2a18' :
+                bl > 0 && bl < b                                             ? '#0f1f2a' : '#1a2332';
+
+            const nameStyle = isStar ? 'color:#4fc3f7;font-weight:bold;' : 'color:#c8d8e8;';
+            const tradeStyle = info.role === 'ASSOC' ? 'color:#90caf9;' : 'color:#7a9ab8;';
+
+            const statusBadge = row.status
+                ? `<span style="background:${row.status==='AW'?'#c62828':row.status==='URLAUB'||row.status==='U'?'#e65100':'#37474f'};color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:bold;">${row.status}</span>`
+                : '';
+
+            return `<tr style="background:${bg};border-bottom:1px solid #243040;">
+                <td style="padding:4px 8px;${nameStyle}">
+                    <span class="fa73v2-star" data-login="${row.login}"
+                        style="cursor:pointer;color:${isStar?'#4fc3f7':'#2d3f55'};margin-right:4px;font-size:13px;">★</span>${row.login || '—'}
+                </td>
+                <td style="padding:4px 6px;font-size:10px;${tradeStyle}">${row.trade}</td>
+                <td style="padding:4px 6px;text-align:center;font-weight:bold;color:#e8edf2;">${row.booked  || '—'}</td>
+                <td style="padding:4px 6px;text-align:center;color:#b0c8e0;">${row.billable || '—'}</td>
+                <td style="padding:4px 6px;text-align:center;color:#b0c8e0;">${row.nonbill  || '—'}</td>
+                <td style="padding:4px 6px;text-align:center;color:#7a9ab8;">${row.avail    || '—'}</td>
+                <td style="padding:4px 6px;text-align:center;">${statusBadge}</td>
             </tr>`;
-        });
-        html += `</tbody><tfoot><tr style="background:#e8eef4;border-top:2px solid #aaa;font-weight:bold;">
-            <td colspan="2" style="padding:4px 6px;color:#555;">∑ ${rows.length}</td>
-            <td style="padding:4px 6px;text-align:center;">${tB.toFixed(1).replace('.', ',')}</td>
-            <td style="padding:4px 6px;text-align:center;">${tBl.toFixed(1).replace('.', ',')}</td>
-            <td colspan="3"></td>
-        </tr></tfoot></table>`;
-        body.innerHTML = html;
+        }).join('');
+
+        document.getElementById('fa73v2-body').innerHTML = `
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <thead><tr style="background:#0a1420;border-bottom:2px solid #2d3f55;position:sticky;top:0;">
+                    <th style="padding:5px 8px;text-align:left;color:#7a9ab8;font-weight:600;">Login</th>
+                    <th style="padding:5px 6px;text-align:left;color:#7a9ab8;font-weight:600;">Trade</th>
+                    <th style="padding:5px 6px;text-align:center;color:#7a9ab8;font-weight:600;">Ges.</th>
+                    <th style="padding:5px 6px;text-align:center;color:#7a9ab8;font-weight:600;">Bill.</th>
+                    <th style="padding:5px 6px;text-align:center;color:#7a9ab8;font-weight:600;">N-Bill.</th>
+                    <th style="padding:5px 6px;text-align:center;color:#7a9ab8;font-weight:600;">Verf.</th>
+                    <th style="padding:5px 6px;text-align:center;color:#7a9ab8;font-weight:600;">Status</th>
+                </tr></thead>
+                <tbody>${rowsHtml}</tbody>
+                <tfoot><tr style="background:#0a1420;border-top:2px solid #2d3f55;">
+                    <td colspan="2" style="padding:5px 8px;color:#4a6a88;font-weight:bold;">∑ ${rows.length}</td>
+                    <td style="padding:5px 6px;text-align:center;color:#e8edf2;font-weight:bold;">${tB.toFixed(1).replace('.',',')}</td>
+                    <td style="padding:5px 6px;text-align:center;color:#b0c8e0;font-weight:bold;">${tBl.toFixed(1).replace('.',',')}</td>
+                    <td colspan="3"></td>
+                </tr></tfoot>
+            </table>`;
     }
 
+    // ── Init ───────────────────────────────────────────────────────────────────
     function init() {
         buildUI();
-        const cached = getCached();
-        if (cached) { renderTable(cached); setStatus('ok'); }
-        if (!_loading) triggerRefresh();
 
+        // Cache zeigen — KEIN Auto-Refresh beim Start
+        const cached = getCached();
+        if (cached) { renderTable(cached); setDot('ok'); }
+
+        // Auto-Refresh: nur wenn Panel sichtbar + Cache abgelaufen
         setInterval(() => {
-            if (!_loading && Date.now() - _lastRefresh > REFRESH_MS) triggerRefresh();
+            const panel = document.getElementById('fa73v2-panel');
+            if (panel?.style.display !== 'none' && !_loading && Date.now() - _lastRefresh > AUTO_REFRESH_MS)
+                triggerRefresh();
         }, 60000);
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        setTimeout(init, 500);
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else setTimeout(init, 500);
 
 })();
