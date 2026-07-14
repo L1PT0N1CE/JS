@@ -25,6 +25,18 @@
     let _lastRefresh = 0;
     let _lastRows = null;
 
+    // ── SHFRPT-Frame finden (window.frames[n] mit USER_FUNCTION_NAME=SHFRPT) ──
+    // Alle Ext/Component-Ops laufen dort, nie im Top-Frame → kein Screen-Context-Konflikt
+    function getShfrptWindow() {
+        for (let i = 0; i < window.frames.length; i++) {
+            try {
+                const ip = window.frames[i].gAppData?.initparams || '';
+                if (ip.includes('USER_FUNCTION_NAME=SHFRPT')) return window.frames[i];
+            } catch(e) {}
+        }
+        return null;
+    }
+
     function getState() {
         try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch(e) { return {}; }
     }
@@ -82,37 +94,44 @@
 
     function loadShiftData() {
         return new Promise((resolve, reject) => {
-            let done = false, wrapDiv = null, comp = null;
+            let done = false, wrapDiv = null, comp = null, fw = null;
             const timer = setTimeout(() => { if (!done) { done = true; reject('timeout'); } }, 45000);
 
-            // ── FIX: comp nach dem Laden wieder verstecken ──────────────
             function finish(r) {
                 if (done) return; done = true;
                 clearTimeout(timer);
                 try { if (wrapDiv) wrapDiv.style.display = 'none'; } catch(e) {}
-                // FIX: CSCASE-Komponente wieder hidden setzen → EAM-Screen-Kontext bleibt auf WSJOBS
-                try { if (comp) { comp.hidden = true; } } catch(e) {}
+                // CSCASE-Komponente wieder hidden → SHFRPT-Frame-Kontext bleibt unberührt
+                try { if (comp) comp.hidden = true; } catch(e) {}
                 r instanceof Error ? reject(r.message) : resolve(r);
             }
 
             let extTries = 0;
             const waitExt = setInterval(() => {
                 if (++extTries > 30) { clearInterval(waitExt); finish(new Error('Ext timeout')); return; }
-                if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return;
+
+                // ── KRITISCH: SHFRPT-Frame nutzen, nicht Top-Frame ──────────────────
+                fw = getShfrptWindow();
+                if (!fw || typeof fw.Ext === 'undefined' || !fw.Ext.ComponentQuery) return;
                 clearInterval(waitExt);
-                comp = Ext.ComponentQuery.query('uxtabiframe').find(c => c.src?.includes('CSCASE'));
+
+                const ExtF = fw.Ext;
+                comp = ExtF.ComponentQuery.query('uxtabiframe').find(c => c.src?.includes('CSCASE'));
                 if (!comp) { finish(new Error('CSCASE nicht gefunden')); return; }
+
                 comp.hidden = false;
                 if (!comp.rendered) {
-                    wrapDiv = document.createElement('div');
+                    // wrapDiv im SHFRPT-Frame erzeugen — bleibt isoliert vom Top-Frame-DOM
+                    wrapDiv = fw.document.createElement('div');
                     wrapDiv.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;overflow:hidden;';
-                    document.body.appendChild(wrapDiv);
+                    fw.document.body.appendChild(wrapDiv);
                     comp.render(wrapDiv);
                 }
+
                 let iframeTries = 0;
                 const waitIframe = setInterval(() => {
                     if (++iframeTries > 40) { clearInterval(waitIframe); finish(new Error('iframe timeout')); return; }
-                    const iframeEl = document.getElementById(comp.id + '-iframeEl');
+                    const iframeEl = fw.document.getElementById(comp.id + '-iframeEl');
                     if (!iframeEl) return;
                     const iExt = iframeEl?.contentWindow?.Ext;
                     if (!iExt?.StoreManager) return;
@@ -191,7 +210,8 @@
                         }
                     } catch(e) {}
                     try {
-                        const iframeEl = document.querySelector('iframe[id*="uxtabiframe"]');
+                        // fw.document statt document — bleibt im SHFRPT-Frame
+                        const iframeEl = fw.document.querySelector('iframe[id*="uxtabiframe"]');
                         if (iframeEl?.contentDocument) {
                             const rows = iframeEl.contentDocument.querySelectorAll('.x-grid-row');
                             if (rows.length > 0) {
@@ -244,33 +264,13 @@
         });
     }
 
-    // Prüfen ob User gerade aktiv in einer WO arbeitet (Record View offen)
-    function isInRecordView() {
-        try {
-            if (typeof Ext === 'undefined') return false;
-            const rvs = Ext.ComponentQuery.query('recordview');
-            const rv  = rvs && rvs[rvs.length - 1];
-            const rec = rv && rv.getRecord && rv.getRecord();
-            return !!(rec && rec.get('workordernum'));
-        } catch(e) { return false; }
-    }
-
     function triggerRefresh(force) {
-        // Auto-Refresh pausieren wenn User in WO Record View — verhindert CSCASE-Kontext-Override
-        if (!force && isInRecordView()) {
-            console.log('[FA73-Float] Auto-Refresh pausiert: User in Record View. Cache bleibt sichtbar.');
-            _lastRefresh = Date.now(); // Timer zurücksetzen damit nicht sofort wieder versucht wird
-            return;
-        }
-
         _loading = true; _lastRefresh = Date.now();
         setStatus('loading');
         loadShiftData()
             .then(rows => { saveCache(rows); renderTable(rows); setStatus('ok'); })
             .catch(e => { console.warn('[FA73-Float]', e); setStatus('error'); })
-            .finally(() => {
-                _loading = false;
-            });
+            .finally(() => { _loading = false; });
     }
 
     let floatEl = null;
@@ -413,13 +413,13 @@
             const nowOpen = panel.style.display !== 'none';
             panel.style.display = nowOpen ? 'none' : 'flex';
             const s = getState(); s.open = !nowOpen; saveState(s);
-            if (!nowOpen && !_loading && !getCached()) triggerRefresh(true);
+            if (!nowOpen && !_loading && !getCached()) triggerRefresh();
         });
 
         document.getElementById('fa73-float-refresh').addEventListener('click', e => {
             e.stopPropagation();
-            _loading = false;
-            triggerRefresh(true); // force=true: auch in Record View laden
+            if (_loading) return;
+            triggerRefresh();
         });
 
         document.getElementById('fa73-float-close').addEventListener('click', e => {
