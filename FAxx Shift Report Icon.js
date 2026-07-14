@@ -32,7 +32,6 @@
         try { localStorage.setItem(STATE_KEY, JSON.stringify(o)); } catch(e) {}
     }
 
-    // Nachtschicht endet ~06:45 — vor 07:00 gilt das gestrige Datum
     function getShiftDate() {
         const now = new Date();
         if (now.getHours() < 7) {
@@ -83,20 +82,25 @@
 
     function loadShiftData() {
         return new Promise((resolve, reject) => {
-            let done = false, wrapDiv = null;
+            let done = false, wrapDiv = null, comp = null;
             const timer = setTimeout(() => { if (!done) { done = true; reject('timeout'); } }, 45000);
+
+            // ── FIX: comp nach dem Laden wieder verstecken ──────────────
             function finish(r) {
                 if (done) return; done = true;
                 clearTimeout(timer);
                 try { if (wrapDiv) wrapDiv.style.display = 'none'; } catch(e) {}
+                // FIX: CSCASE-Komponente wieder hidden setzen → EAM-Screen-Kontext bleibt auf WSJOBS
+                try { if (comp) { comp.hidden = true; } } catch(e) {}
                 r instanceof Error ? reject(r.message) : resolve(r);
             }
+
             let extTries = 0;
             const waitExt = setInterval(() => {
                 if (++extTries > 30) { clearInterval(waitExt); finish(new Error('Ext timeout')); return; }
                 if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return;
                 clearInterval(waitExt);
-                const comp = Ext.ComponentQuery.query('uxtabiframe').find(c => c.src?.includes('CSCASE'));
+                comp = Ext.ComponentQuery.query('uxtabiframe').find(c => c.src?.includes('CSCASE'));
                 if (!comp) { finish(new Error('CSCASE nicht gefunden')); return; }
                 comp.hidden = false;
                 if (!comp.rendered) {
@@ -128,7 +132,6 @@
             }
 
             function selectAndLoad(iExt, listStore) {
-                // Richtigen Shift anhand von eventstartdate + getShiftDate() wählen
                 let idx = 0, bestIdx = -1;
                 const shiftDateStr = getShiftDate();
                 for (let i = 0; i < listStore.getCount(); i++) {
@@ -136,7 +139,7 @@
                     if (!rec) continue;
                     const d = rec.data;
                     if (!((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73')) continue;
-                    if (bestIdx === -1) bestIdx = i; // erster Match als Fallback
+                    if (bestIdx === -1) bestIdx = i;
                     if (d.eventstartdate) {
                         const startDate = new Date(d.eventstartdate).toDateString();
                         if (startDate === shiftDateStr) { bestIdx = i; break; }
@@ -241,13 +244,33 @@
         });
     }
 
-    function triggerRefresh() {
+    // Prüfen ob User gerade aktiv in einer WO arbeitet (Record View offen)
+    function isInRecordView() {
+        try {
+            if (typeof Ext === 'undefined') return false;
+            const rvs = Ext.ComponentQuery.query('recordview');
+            const rv  = rvs && rvs[rvs.length - 1];
+            const rec = rv && rv.getRecord && rv.getRecord();
+            return !!(rec && rec.get('workordernum'));
+        } catch(e) { return false; }
+    }
+
+    function triggerRefresh(force) {
+        // Auto-Refresh pausieren wenn User in WO Record View — verhindert CSCASE-Kontext-Override
+        if (!force && isInRecordView()) {
+            console.log('[FA73-Float] Auto-Refresh pausiert: User in Record View. Cache bleibt sichtbar.');
+            _lastRefresh = Date.now(); // Timer zurücksetzen damit nicht sofort wieder versucht wird
+            return;
+        }
+
         _loading = true; _lastRefresh = Date.now();
         setStatus('loading');
         loadShiftData()
             .then(rows => { saveCache(rows); renderTable(rows); setStatus('ok'); })
             .catch(e => { console.warn('[FA73-Float]', e); setStatus('error'); })
-            .finally(() => { _loading = false; });
+            .finally(() => {
+                _loading = false;
+            });
     }
 
     let floatEl = null;
@@ -390,13 +413,13 @@
             const nowOpen = panel.style.display !== 'none';
             panel.style.display = nowOpen ? 'none' : 'flex';
             const s = getState(); s.open = !nowOpen; saveState(s);
-            if (!nowOpen && !_loading && !getCached()) triggerRefresh();
+            if (!nowOpen && !_loading && !getCached()) triggerRefresh(true);
         });
 
         document.getElementById('fa73-float-refresh').addEventListener('click', e => {
             e.stopPropagation();
             _loading = false;
-            triggerRefresh();
+            triggerRefresh(true); // force=true: auch in Record View laden
         });
 
         document.getElementById('fa73-float-close').addEventListener('click', e => {
