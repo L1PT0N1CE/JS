@@ -1,16 +1,20 @@
 (function () {
     'use strict';
 
+    if (window !== window.top) return;
+    if (window._fa73FloatInit) return;
+    window._fa73FloatInit = true;
+
     const SHIFT_DESC  = 'FRA7 Schicht 3';
-    const PANEL_ID    = 'aki-fa73-panel';
-    const REFRESH_MS  = 5 * 60 * 1000;
     const STORE_LIST  = 'EAM.store.operation.casemanagement.cscase_lst_lst';
     const STORE_LABOR = 'EAM.store.operation.casemanagement.cscase_xsd_xsd';
     const SR_SETTINGS = 'sr-shift-settings-v2';
-    const CACHE_KEY   = 'fa73_panel_cache_v2';
-    const CUSTOM_KEY  = 'fa73_custom_v1';
+    const CACHE_KEY   = 'fa73_float_cache_v1';
+    const STATE_KEY   = 'fa73_float_state_v1';
+    const STARS_KEY   = 'fa73_float_stars_v1';
+    const DEFAULT_STARS = ['kanataza', 'rmalogor', 'hsshimen'];
+    const REFRESH_MS  = 5 * 60 * 1000;
 
-    // EAM_ORDER nur als letzter Fallback (Store-Reihenfolge ändert sich täglich)
     const EAM_ORDER = [
         'hsshimen','klikevi','ussaxel','jsonsta','rmalogor','shalsami',
         'kanataza','kedama','lugejaso','schmidqd','halkenhc','schudack',
@@ -19,121 +23,72 @@
 
     let _loading = false;
     let _lastRefresh = 0;
+    let _lastRows = null;
 
-    // ─── Custom Settings (★ + Reihenfolge) ────────────────────────────────────
-    function getCustom()   { try { return JSON.parse(localStorage.getItem(CUSTOM_KEY)||'{}'); } catch(e){ return {}; } }
-    function saveCustom(o) { try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(o)); } catch(e){} }
-    function getStarred()  { return new Set(getCustom().starred || []); }
-    function getOrder()    { return getCustom().order || []; }
-
-    function toggleStar(login) {
-        const c = getCustom();
-        const s = new Set(c.starred || []);
-        s.has(login) ? s.delete(login) : s.add(login);
-        c.starred = [...s];
-        saveCustom(c);
+    function getState() {
+        try { return JSON.parse(localStorage.getItem(STATE_KEY) || '{}'); } catch(e) { return {}; }
+    }
+    function saveState(o) {
+        try { localStorage.setItem(STATE_KEY, JSON.stringify(o)); } catch(e) {}
     }
 
-    function moveRow(login, dir) {
-        const c = getCustom();
-        let order = c.order || [];
-        if (!order.length) {
-            const cached = getCached();
-            order = cached ? cached.map(r => r.person).filter(Boolean) : [...EAM_ORDER];
+    // Nachtschicht endet ~06:45 — vor 07:00 gilt das gestrige Datum
+    function getShiftDate() {
+        const now = new Date();
+        if (now.getHours() < 7) {
+            const d = new Date(now); d.setDate(d.getDate() - 1);
+            return d.toDateString();
         }
-        const idx = order.indexOf(login);
-        if (idx === -1) { c.order = order; saveCustom(c); return; }
-        const target = idx + dir;
-        if (target < 0 || target >= order.length) { c.order = order; saveCustom(c); return; }
-        [order[idx], order[target]] = [order[target], order[idx]];
-        c.order = order;
-        saveCustom(c);
+        return now.toDateString();
     }
 
-    function applyCustomOrder(rows) {
-        const order = getOrder();
-        if (!order.length) return rows;
-        const map = {};
-        rows.forEach(r => { if (r.person) map[r.person] = r; });
-        const sorted = order.map(l => map[l]).filter(Boolean);
-        rows.forEach(r => { if (r.person && !order.includes(r.person)) sorted.push(r); });
-        return sorted;
+    function getStars() {
+        try {
+            const a = JSON.parse(localStorage.getItem(STARS_KEY) || 'null');
+            if (Array.isArray(a)) return new Set(a);
+        } catch(e) {}
+        return new Set(DEFAULT_STARS);
+    }
+    function saveStars(s) {
+        try { localStorage.setItem(STARS_KEY, JSON.stringify([...s])); } catch(e) {}
     }
 
-    // ─── Cache ────────────────────────────────────────────────────────────────
     function getCached() {
         try {
-            const o = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-            if (!o || o.date !== new Date().toDateString()) return null;
-            if (o.ts && Date.now() - o.ts > 30*60*1000) return null;
+            const o = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+            if (!o || o.date !== getShiftDate()) return null;
+            if (o.ts && Date.now() - o.ts > 30 * 60 * 1000) return null;
             return o.rows;
-        } catch(e){ return null; }
+        } catch(e) { return null; }
     }
     function saveCache(rows) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({date:new Date().toDateString(),ts:Date.now(),rows})); } catch(e){}
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ date: getShiftDate(), ts: Date.now(), rows })); } catch(e) {}
     }
 
-    // ─── KPI-Body finden ──────────────────────────────────────────────────────
-    function getKpiBody() {
-        return document.querySelector('[id*="bsstrt_kpis"][id$="-body"]');
-    }
-    function isStartCenter() {
-        return !!getKpiBody();
-    }
-
-    // ─── Haupt-Loop ───────────────────────────────────────────────────────────
-    setInterval(() => {
-        if (!isStartCenter()) {
-            if (_loading) _loading = false;
-            const old = document.getElementById(PANEL_ID);
-            if (old) old.remove();
-            return;
-        }
-        const panel = document.getElementById(PANEL_ID);
-        if (!panel) {
-            injectPanel(getCached() || null);
-            if (!_loading) triggerRefresh();
-            return;
-        }
-        const kb = getKpiBody();
-        if (kb && !kb.contains(panel)) { panel.remove(); return; }
-        if (!_loading && Date.now() - _lastRefresh > REFRESH_MS) triggerRefresh();
-    }, 1000);
-
-    function triggerRefresh() {
-        _loading = true; _lastRefresh = Date.now();
-        loadShiftData()
-            .then(rows => { saveCache(rows); injectPanel(rows); })
-            .catch(e => console.warn('[FA73]', e))
-            .finally(() => { _loading = false; });
-    }
-
-    // ─── Login-Map ────────────────────────────────────────────────────────────
     function getShiftLoginMap() {
         const map = {};
         try {
-            const s = JSON.parse(localStorage.getItem(SR_SETTINGS)||'null');
+            const s = JSON.parse(localStorage.getItem(SR_SETTINGS) || 'null');
             if (!s) return map;
             for (const k of Object.keys(s)) {
                 const sh = s[k];
                 if (sh?.name?.includes(SHIFT_DESC)) {
-                    (sh.entries||[]).forEach(e => { map[e.login] = {hl:e.highlight||false,role:e.role||''}; });
+                    (sh.entries || []).forEach(e => { map[e.login] = { hl: e.highlight || false }; });
                     break;
                 }
             }
-        } catch(e){}
+        } catch(e) {}
         return map;
     }
 
-    // ─── Daten laden ──────────────────────────────────────────────────────────
     function loadShiftData() {
         return new Promise((resolve, reject) => {
             let done = false, wrapDiv = null;
-            const timer = setTimeout(() => { if (!done){done=true;reject('timeout');} }, 45000);
+            const timer = setTimeout(() => { if (!done) { done = true; reject('timeout'); } }, 45000);
             function finish(r) {
                 if (done) return; done = true;
                 clearTimeout(timer);
-                try { if (wrapDiv) wrapDiv.style.display='none'; } catch(e){}
+                try { if (wrapDiv) wrapDiv.style.display = 'none'; } catch(e) {}
                 r instanceof Error ? reject(r.message) : resolve(r);
             }
             let extTries = 0;
@@ -153,7 +108,9 @@
                 let iframeTries = 0;
                 const waitIframe = setInterval(() => {
                     if (++iframeTries > 40) { clearInterval(waitIframe); finish(new Error('iframe timeout')); return; }
-                    const iExt = document.querySelector('iframe')?.contentWindow?.Ext;
+                    const iframeEl = document.getElementById(comp.id + '-iframeEl');
+                    if (!iframeEl) return;
+                    const iExt = iframeEl?.contentWindow?.Ext;
                     if (!iExt?.StoreManager) return;
                     clearInterval(waitIframe);
                     waitForList(iExt);
@@ -171,50 +128,57 @@
             }
 
             function selectAndLoad(iExt, listStore) {
-                let idx = 0;
+                // Richtigen Shift anhand von eventstartdate + getShiftDate() wählen
+                let idx = 0, bestIdx = -1;
+                const shiftDateStr = getShiftDate();
                 for (let i = 0; i < listStore.getCount(); i++) {
-                    const d = listStore.data.items[i].data;
-                    if ((d.casedescription||'').includes(SHIFT_DESC)||d.shift==='FA73') { idx=i; break; }
+                    const rec = listStore.getAt ? listStore.getAt(i) : (listStore.data?.items?.[i]);
+                    if (!rec) continue;
+                    const d = rec.data;
+                    if (!((d.casedescription || '').includes(SHIFT_DESC) || d.shift === 'FA73')) continue;
+                    if (bestIdx === -1) bestIdx = i; // erster Match als Fallback
+                    if (d.eventstartdate) {
+                        const startDate = new Date(d.eventstartdate).toDateString();
+                        if (startDate === shiftDateStr) { bestIdx = i; break; }
+                    }
                 }
+                if (bestIdx !== -1) idx = bestIdx;
                 for (const g of iExt.ComponentQuery.query('gridpanel')) {
                     try {
                         const gs = g.getStore?.();
-                        if (gs && (gs.storeId||gs.id||'').includes('cscase_lst')) {
+                        if (gs && (gs.storeId || gs.id || '').includes('cscase_lst')) {
                             g.getSelectionModel().select(idx, false, false); break;
                         }
-                    } catch(e){}
+                    } catch(e) {}
                 }
                 const oldLs = iExt.StoreManager.lookup(STORE_LABOR);
-                if (oldLs) try { oldLs.removeAll(); } catch(e){}
+                if (oldLs) try { oldLs.removeAll(); } catch(e) {}
                 setTimeout(() => {
                     try {
                         for (const tp of iExt.ComponentQuery.query('uxtabpanel')) {
                             const items = tp.items?.items || [];
-                            const lt = items.find(t => t.title==='Labor');
+                            const lt = items.find(t => t.title === 'Labor');
                             if (lt) {
-                                const rt = items.find(t => t.title==='Record View');
-                                try { if (rt) tp.setActiveTab(rt); } catch(e){}
-                                setTimeout(() => { try { tp.setActiveTab(lt); } catch(e){} }, 300);
+                                const rt = items.find(t => t.title === 'Record View');
+                                try { if (rt) tp.setActiveTab(rt); } catch(e) {}
+                                setTimeout(() => { try { tp.setActiveTab(lt); } catch(e) {} }, 300);
                                 break;
                             }
                         }
-                    } catch(e){}
+                    } catch(e) {}
                     waitForLabor(iExt);
                 }, 1200);
             }
 
             function waitForLabor(iExt) {
                 let resolved = false;
-
-                // v4.4 FIX: break→continue + contentDocument-Fallback + Login-Format-Filter
                 function getGridLogins() {
-                    // Versuch 1: iExt ComponentQuery (präzise, aber Grid muss gerendert sein)
                     try {
                         for (const g of iExt.ComponentQuery.query('gridpanel')) {
                             const gst = g.getStore && g.getStore();
-                            if (!gst || (gst.storeId||gst.id||'') !== STORE_LABOR) continue;
+                            if (!gst || (gst.storeId || gst.id || '') !== STORE_LABOR) continue;
                             const view = g.getView && g.getView();
-                            if (!view || !view.el || !view.el.dom) continue; // v4.4: war break!
+                            if (!view || !view.el || !view.el.dom) continue;
                             const rows = view.el.dom.querySelectorAll('.x-grid-row');
                             const result = Array.from(rows).map(r => {
                                 const c = r.querySelector('.x-grid-cell-inner');
@@ -223,14 +187,11 @@
                             if (result.length > 0) return result;
                         }
                     } catch(e) {}
-
-                    // Versuch 2: contentDocument (same-origin, kein ExtJS nötig)
                     try {
                         const iframeEl = document.querySelector('iframe[id*="uxtabiframe"]');
-                        if (iframeEl && iframeEl.contentDocument) {
+                        if (iframeEl?.contentDocument) {
                             const rows = iframeEl.contentDocument.querySelectorAll('.x-grid-row');
                             if (rows.length > 0) {
-                                // Login-Format-Filter: nur Logins ohne Leerzeichen, 4-15 Zeichen
                                 const result = Array.from(rows).map(r => {
                                     const c = r.querySelector('.x-grid-cell-inner');
                                     return c ? c.textContent.trim().toLowerCase() : '';
@@ -239,172 +200,291 @@
                             }
                         }
                     } catch(e) {}
-
                     return [];
                 }
-
                 function process(ls) {
                     if (resolved) return; resolved = true;
                     const lm = getShiftLoginMap();
                     const gridLogins = getGridLogins();
-                    finish(ls.data.items.map((item, i) => {
+                    finish((ls.getRange ? ls.getRange() : (ls.data&&ls.data.items||[])).map((item, i) => {
                         const d = item.data;
-                        // Priorität: Store-Feld → Grid-Zelle → EAM_ORDER Fallback
-                        const login = d.xsd_shp_person||d.xsd_person||d.xsd_employee||gridLogins[i]||EAM_ORDER[i]||'';
-                        const info  = lm[login] || {};
-                        return { person:login, hl:info.hl||false, trade:d.xsd_csm_trade||'',
-                            booked:d.xsd_booked_labor_shift||'', billable:d.xsd_hours_billable_n||'',
-                            nonbill:d.xsd_hours_nonbillable||'', avail:d.xsd_hours_avail||'',
-                            status:d.xsd_exc_comment||'' };
+                        const login = d.xsd_shp_person || d.xsd_person || d.xsd_employee || gridLogins[i] || EAM_ORDER[i] || '';
+                        const info = lm[login] || {};
+                        const booked = d.xsd_booked_labor_shift
+                            || (d.xsd_hours_billable_n || d.xsd_hours_billable_o
+                                ? String(parseFloat(d.xsd_hours_billable_n||0) + parseFloat(d.xsd_hours_billable_o||0) || '')
+                                : '');
+                        return {
+                            person: login, hl: info.hl || false, trade: d.xsd_csm_trade || '',
+                            booked: booked,
+                            billable: d.xsd_hours_billable_n || '',
+                            nonbill: d.xsd_hours_nonbillable || d.xsd_hours_billable_o || '',
+                            avail: d.xsd_hours_avail || '',
+                            status: d.xsd_exc_comment || ''
+                        };
                     }));
                 }
                 iExt.StoreManager.on('add', function onAdd(mgr, store) {
-                    if ((store.storeId||store.id)===STORE_LABOR) {
+                    if ((store.storeId || store.id) === STORE_LABOR) {
                         iExt.StoreManager.un('add', onAdd);
-                        // v4.4: 500ms Delay - Grid braucht Zeit zum Rendern nach Store-Load
-                        store.on('load', () => setTimeout(() => process(store), 500), null, {single:true});
+                        store.on('load', () => setTimeout(() => process(store), 500), null, { single: true });
                     }
                 });
                 let tries = 0;
                 const poll = setInterval(() => {
                     if (++tries > 50) { clearInterval(poll); if (!resolved) finish(new Error('Labor timeout')); return; }
                     const ls = iExt.StoreManager.lookup(STORE_LABOR);
-                    if (!ls || ls.getCount()===0) return;
-                    // v4.4: 500ms Delay - Grid braucht Zeit zum Rendern nach Store-Load
+                    if (!ls || ls.getCount() === 0) return;
                     clearInterval(poll); setTimeout(() => process(ls), 500);
                 }, 400);
             }
         });
     }
 
-    // ─── Panel UI ────────────────────────────────────────────────────────────
-    function injectPanel(rows) {
-        const kb = getKpiBody();
-        if (!kb) return;
-
-        let panel = document.getElementById(PANEL_ID);
-        if (!panel) {
-            panel = document.createElement('div');
-            panel.id = PANEL_ID;
-            panel.style.cssText = 'margin:0;background:#fff;font-family:Arial,sans-serif;font-size:12px;';
-            kb.style.overflow = 'auto';
-            const kv = kb.querySelector('.x-dataview');
-            if (kv) kv.style.display = 'none';
-            kb.insertBefore(panel, kb.firstChild);
-            panel.addEventListener('click', onPanelClick);
-        }
-
-        const isLoading = rows === null;
-        const isError   = rows === 'error';
-        if (rows && !isLoading && !isError) rows = applyCustomOrder(rows);
-
-        const now = new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
-        const body = isLoading ? '<div style="padding:10px;color:#999;text-align:center;">Lade FA73...</div>'
-                   : isError   ? '<div style="padding:8px;color:#c00;">Fehler – <span class="fa73-retry" style="color:#ff9900;cursor:pointer;">Neu laden</span></div>'
-                   : buildTable(rows);
-
-        panel.innerHTML =
-            '<div style="padding:5px 8px;display:flex;align-items:center;justify-content:space-between;background:#232f3e;">' +
-            '<span style="font-weight:bold;font-size:12px;color:#fff;">FA73 Shift Report</span>' +
-            `<span style="font-size:10px;color:#aaa;">${now} &nbsp;<span class="fa73-refresh" style="color:#ff9900;cursor:pointer;font-size:14px;">&#8635;</span></span>` +
-            '</div>' + body;
+    function triggerRefresh() {
+        _loading = true; _lastRefresh = Date.now();
+        setStatus('loading');
+        loadShiftData()
+            .then(rows => { saveCache(rows); renderTable(rows); setStatus('ok'); })
+            .catch(e => { console.warn('[FA73-Float]', e); setStatus('error'); })
+            .finally(() => { _loading = false; });
     }
 
-    function onPanelClick(e) {
-        const starEl = e.target.closest('[data-star-login]');
-        if (starEl) {
+    let floatEl = null;
+
+    function buildUI() {
+        if (document.getElementById('fa73-float-root')) return;
+
+        const st = getState();
+        const open = st.open !== false;
+        const x = st.x ?? null;
+        const y = st.y ?? null;
+
+        const root = document.createElement('div');
+        root.id = 'fa73-float-root';
+        root.style.cssText = `
+            position: fixed;
+            z-index: 999999;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            user-select: none;
+            ${x !== null ? `left:${x}px;top:${y}px;` : 'right:18px;bottom:18px;'}
+        `;
+
+        const fab = document.createElement('div');
+        fab.id = 'fa73-fab';
+        fab.style.cssText = `
+            background: #232f3e;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            transition: background 0.15s;
+            white-space: nowrap;
+        `;
+        fab.innerHTML = 'FA73 <span id="fa73-status-dot" style="width:8px;height:8px;border-radius:50%;background:#aaa;display:inline-block;"></span>';
+        fab.title = 'FA73 Shift Report öffnen';
+
+        const panel = document.createElement('div');
+        panel.id = 'fa73-float-panel';
+        floatEl = panel;
+        panel.style.cssText = `
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+            width: 620px;
+            max-height: 500px;
+            display: ${open ? 'flex' : 'none'};
+            flex-direction: column;
+            overflow: hidden;
+            margin-bottom: 8px;
+        `;
+
+        const header = document.createElement('div');
+        header.style.cssText = `
+            background: #232f3e;
+            color: #fff;
+            padding: 7px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: move;
+            flex-shrink: 0;
+        `;
+        header.innerHTML = `
+            <span style="font-weight:bold;font-size:12px;">FA73 Shift Report</span>
+            <span style="display:flex;align-items:center;gap:8px;font-size:11px;color:#aaa;">
+                <span id="fa73-float-time"></span>
+                <span id="fa73-float-refresh" title="Refresh" style="color:#ff9900;cursor:pointer;font-size:16px;line-height:1;">&#8635;</span>
+                <span id="fa73-float-close" title="Minimieren" style="color:#aaa;cursor:pointer;font-size:14px;line-height:1;">&#8722;</span>
+            </span>
+        `;
+
+        const body = document.createElement('div');
+        body.id = 'fa73-float-body';
+        body.style.cssText = 'overflow-y:auto;flex:1;';
+        body.innerHTML = '<div style="padding:16px;text-align:center;color:#999;">Lade FA73...</div>';
+
+        panel.appendChild(header);
+        panel.appendChild(body);
+        root.appendChild(panel);
+        root.appendChild(fab);
+        document.body.appendChild(root);
+
+        body.addEventListener('click', e => {
+            const star = e.target.closest('.fa73-star');
+            if (!star) return;
+            e.stopPropagation();
+            const login = star.dataset.login;
+            const s = getStars();
+            if (s.has(login)) s.delete(login); else s.add(login);
+            saveStars(s);
+            if (_lastRows) renderTable(_lastRows);
+        });
+
+        let dragging = false, dragged = false, dragOffX = 0, dragOffY = 0;
+
+        function startDrag(e) {
+            dragging = true; dragged = false;
+            const rect = root.getBoundingClientRect();
+            dragOffX = e.clientX - rect.left;
+            dragOffY = e.clientY - rect.top;
             e.preventDefault();
-            toggleStar(starEl.dataset.starLogin);
-            injectPanel(getCached() || null);
-            return;
         }
-        const moveEl = e.target.closest('[data-move-login]');
-        if (moveEl) {
-            e.preventDefault();
-            moveRow(moveEl.dataset.moveLogin, parseInt(moveEl.dataset.moveDir));
-            injectPanel(getCached() || null);
-            return;
-        }
-        if (e.target.closest('.fa73-refresh')) {
-            e.preventDefault();
-            injectPanel(getCached() || null);
-            if (!_loading) triggerRefresh();
-            return;
-        }
-        if (e.target.closest('.fa73-retry')) {
-            e.preventDefault();
-            injectPanel(null);
-            if (!_loading) triggerRefresh();
-            return;
+
+        header.addEventListener('mousedown', e => {
+            if (e.target.id === 'fa73-float-refresh' || e.target.id === 'fa73-float-close') return;
+            startDrag(e);
+        });
+
+        fab.addEventListener('mousedown', e => { startDrag(e); });
+
+        document.addEventListener('mousemove', e => {
+            if (!dragging) return;
+            const nx = Math.max(0, Math.min(window.innerWidth - root.offsetWidth, e.clientX - dragOffX));
+            const ny = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, e.clientY - dragOffY));
+            root.style.left = nx + 'px';
+            root.style.top  = ny + 'px';
+            root.style.right = 'auto';
+            root.style.bottom = 'auto';
+            dragged = true;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!dragging) return;
+            dragging = false;
+            const rect = root.getBoundingClientRect();
+            const s = getState();
+            s.x = Math.round(rect.left); s.y = Math.round(rect.top);
+            saveState(s);
+        });
+
+        fab.addEventListener('click', () => {
+            if (dragged) { dragged = false; return; }
+            const nowOpen = panel.style.display !== 'none';
+            panel.style.display = nowOpen ? 'none' : 'flex';
+            const s = getState(); s.open = !nowOpen; saveState(s);
+            if (!nowOpen && !_loading && !getCached()) triggerRefresh();
+        });
+
+        document.getElementById('fa73-float-refresh').addEventListener('click', e => {
+            e.stopPropagation();
+            _loading = false;
+            triggerRefresh();
+        });
+
+        document.getElementById('fa73-float-close').addEventListener('click', e => {
+            e.stopPropagation();
+            panel.style.display = 'none';
+            const s = getState(); s.open = false; saveState(s);
+        });
+    }
+
+    function setStatus(state) {
+        const dot = document.getElementById('fa73-status-dot');
+        const time = document.getElementById('fa73-float-time');
+        if (dot) dot.style.background = state === 'ok' ? '#4caf50' : state === 'loading' ? '#ff9900' : '#f44336';
+        if (time && state !== 'loading') {
+            const now = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+            time.textContent = now;
         }
     }
 
-    // ─── Tabelle ─────────────────────────────────────────────────────────────
-    function buildTable(rows) {
-        if (!rows?.length) return '<div style="padding:8px;color:#999;text-align:center;">Keine Daten</div>';
+    function renderTable(rows) {
+        _lastRows = rows;
+        const body = document.getElementById('fa73-float-body');
+        if (!body) return;
+        if (!rows || !rows.length) {
+            body.innerHTML = '<div style="padding:12px;text-align:center;color:#999;">Keine Daten</div>';
+            return;
+        }
+        const stars = getStars();
         let tB = 0, tBl = 0;
-        const starred = getStarred();
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead><tr style="background:#f0f0f0;border-bottom:2px solid #ddd;position:sticky;top:0;">
+                <th style="padding:4px 6px;text-align:left;">Login</th>
+                <th style="padding:4px 6px;text-align:left;">Trade</th>
+                <th style="padding:4px 6px;text-align:center;">Ges.</th>
+                <th style="padding:4px 6px;text-align:center;">Bill.</th>
+                <th style="padding:4px 6px;text-align:center;">N-Bill.</th>
+                <th style="padding:4px 6px;text-align:center;">Verf.</th>
+                <th style="padding:4px 6px;text-align:center;">Status</th>
+            </tr></thead><tbody>`;
 
-        let html = `<div style="overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="background:#f0f0f0;border-bottom:2px solid #ddd;">
-            <th style="padding:4px 2px 4px 6px;width:18px;"></th>
-            <th style="padding:4px 2px;width:28px;"></th>
-            <th style="padding:4px 6px;text-align:left;">Login</th>
-            <th style="padding:4px 6px;text-align:left;">Trade</th>
-            <th style="padding:4px 6px;text-align:center;">Ges.</th>
-            <th style="padding:4px 6px;text-align:center;">Bill.</th>
-            <th style="padding:4px 6px;text-align:center;">N-Bill.</th>
-            <th style="padding:4px 6px;text-align:center;">Verf.</th>
-            <th style="padding:4px 6px;text-align:center;">Status</th>
-        </tr></thead><tbody>`;
-
-        rows.forEach((row, idx) => {
-            const b  = parseFloat((row.booked  ||'0').replace(',','.')) || 0;
-            const bl = parseFloat((row.billable||'0').replace(',','.')) || 0;
+        rows.forEach(row => {
+            const b  = parseFloat((row.booked   || '0').replace(',', '.')) || 0;
+            const bl = parseFloat((row.billable || '0').replace(',', '.')) || 0;
             tB += b; tBl += bl;
-
-            const isStar = starred.has(row.person) || row.hl;
-            const bg = row.status==='AW' ? '#ffcdd2'
-                     : b===0            ? '#ffebee'
-                     : bl>b             ? '#fff9c4'
-                     : bl<b             ? '#bbdefb'
-                     : bl===b&&b>0      ? '#c8e6c9' : '#fff';
-
-            const st = row.status==='AW'     ? '<span style="background:#c00;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">AW</span>'
-                     : row.status==='U'||row.status==='u' ? '<span style="background:#e65100;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">U</span>'
-                     : row.status==='Urlaub' ? '<span style="background:#7b1fa2;color:#fff;padding:0 3px;border-radius:2px;">Urlaub</span>'
-                     : row.status           ? `<span style="background:#eee;padding:0 3px;border-radius:2px;">${row.status}</span>` : '';
-
-            const nc = isStar ? 'color:#d32f2f;font-weight:bold;' : 'color:#232f3e;';
-
+            const hl = stars.has(row.person);
+            const bg = row.status === 'AW' ? '#ffcdd2'
+                     : b === 0             ? '#ffebee'
+                     : bl > b              ? '#fff9c4'
+                     : bl < b              ? '#bbdefb'
+                     : bl === b && b > 0   ? '#c8e6c9' : '#fff';
+            const nc = hl ? 'color:#00bcd4;font-weight:bold;' : '';
+            const st = row.status === 'AW' ? '<span style="background:#c00;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">AW</span>'
+                     : row.status === 'U'  ? '<span style="background:#e65100;color:#fff;padding:0 3px;border-radius:2px;font-weight:bold;">U</span>'
+                     : row.status          ? `<span style="background:#eee;padding:0 3px;border-radius:2px;">${row.status}</span>` : '';
             html += `<tr style="background:${bg};border-bottom:1px solid #f0f0f0;">
-                <td style="padding:2px 2px 2px 6px;text-align:center;">
-                    <span data-star-login="${row.person}" style="cursor:pointer;font-size:13px;color:${isStar?'#f59e0b':'#ccc'};"
-                        title="${isStar?'Stern entfernen':'Favorit setzen'}">${isStar?'★':'☆'}</span>
-                </td>
-                <td style="padding:2px 2px;text-align:center;white-space:nowrap;">
-                    <span data-move-login="${row.person}" data-move-dir="-1"
-                        style="cursor:${idx>0?'pointer':'default'};font-size:10px;color:${idx>0?'#555':'#ddd'};padding:0 1px;">▲</span>
-                    <span data-move-login="${row.person}" data-move-dir="1"
-                        style="cursor:${idx<rows.length-1?'pointer':'default'};font-size:10px;color:${idx<rows.length-1?'#555':'#ddd'};padding:0 1px;">▼</span>
-                </td>
-                <td style="padding:3px 6px;${nc}">${row.person||'—'}</td>
+                <td style="padding:3px 6px;${nc}"><span class="fa73-star" data-login="${row.person}" style="cursor:pointer;color:${hl ? '#00bcd4' : '#ccc'};margin-right:3px;" title="Stern togglen">★</span>${row.person || '—'}</td>
                 <td style="padding:3px 6px;color:#666;">${row.trade}</td>
-                <td style="padding:3px 6px;text-align:center;font-weight:bold;">${row.booked||'—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.billable||'—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.nonbill||'—'}</td>
-                <td style="padding:3px 6px;text-align:center;">${row.avail||'—'}</td>
+                <td style="padding:3px 6px;text-align:center;font-weight:bold;">${row.booked  || '—'}</td>
+                <td style="padding:3px 6px;text-align:center;">${row.billable || '—'}</td>
+                <td style="padding:3px 6px;text-align:center;">${row.nonbill  || '—'}</td>
+                <td style="padding:3px 6px;text-align:center;">${row.avail    || '—'}</td>
                 <td style="padding:3px 6px;text-align:center;">${st}</td>
             </tr>`;
         });
-
         html += `</tbody><tfoot><tr style="background:#e8eef4;border-top:2px solid #aaa;font-weight:bold;">
-            <td colspan="4" style="padding:4px 6px;color:#555;">∑ ${rows.length} Personen</td>
-            <td style="padding:4px 6px;text-align:center;">${tB.toFixed(1).replace('.',',')}</td>
-            <td style="padding:4px 6px;text-align:center;">${tBl.toFixed(1).replace('.',',')}</td>
+            <td colspan="2" style="padding:4px 6px;color:#555;">∑ ${rows.length}</td>
+            <td style="padding:4px 6px;text-align:center;">${tB.toFixed(1).replace('.', ',')}</td>
+            <td style="padding:4px 6px;text-align:center;">${tBl.toFixed(1).replace('.', ',')}</td>
             <td colspan="3"></td>
-        </tr></tfoot></table></div>`;
-        return html;
+        </tr></tfoot></table>`;
+        body.innerHTML = html;
+    }
+
+    function init() {
+        buildUI();
+        const cached = getCached();
+        if (cached) { renderTable(cached); setStatus('ok'); }
+        if (!_loading) triggerRefresh();
+
+        setInterval(() => {
+            if (!_loading && Date.now() - _lastRefresh > REFRESH_MS) triggerRefresh();
+        }, 60000);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        setTimeout(init, 500);
     }
 
 })();
