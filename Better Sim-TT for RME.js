@@ -683,4 +683,230 @@
         }
     });
 
+
+    // ==================== Forward to IT (Alt+5) ====================
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+        async function waitFor(fn, timeout = 6000) {
+            for (let i = 0; i < timeout / 100; i++) { const el = fn(); if (el) return el; await sleep(100); }
+            return null;
+        }
+    
+        // Status Badge — sichtbares Feedback ohne F12
+        function badge(msg, color = '#3b82f6') {
+            let b = document.getElementById('__it_badge__');
+            if (!b) {
+                b = document.createElement('div');
+                b.id = '__it_badge__';
+                Object.assign(b.style, {
+                    position:'fixed', top:'12px', left:'50%', transform:'translateX(-50%)',
+                    zIndex:'2147483647', padding:'8px 18px', borderRadius:'8px',
+                    fontFamily:'monospace', fontSize:'13px', fontWeight:'bold',
+                    color:'#fff', boxShadow:'0 4px 12px rgba(0,0,0,.5)',
+                    transition:'background .3s', pointerEvents:'none',
+                });
+                document.body.appendChild(b);
+            }
+            b.style.background = color;
+            b.textContent = msg;
+            b.style.display = 'block';
+        }
+        function badgeHide() {
+            const b = document.getElementById('__it_badge__');
+            if (b) b.style.display = 'none';
+        }
+    
+        // Versucht alle bekannten React-Handler-Namen
+        function reactTrigger(el, isOption = false) {
+            const fiberKey = Object.keys(el).find(k =>
+                k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance')
+            );
+            if (!fiberKey) return 'no-fiber';
+    
+            const fakeEv = {
+                type:'mousedown', target:el, currentTarget:el,
+                bubbles:true, cancelable:true,
+                isTrusted:true, detail:1, button:0, buttons:1,
+                clientX:0, clientY:0,
+                preventDefault:()=>{}, stopPropagation:()=>{},
+                nativeEvent:{ isTrusted:true, detail:1 },
+            };
+    
+            // Reihenfolge der Versuche: mousedown zuerst (awsui öffnet bei mousedown)
+            // Options brauchen onClick, Buttons brauchen onMouseDown
+            const tryHandlers = isOption
+                ? ['onClick','onMouseDown','onPointerDown']
+                : ['onMouseDown','onPointerDown','onClick','onMouseUp'];
+    
+            let fiber = el[fiberKey];
+            while (fiber) {
+                const props = fiber.memoizedProps;
+                if (props) {
+                    for (const h of tryHandlers) {
+                        if (typeof props[h] === 'function') {
+                            fakeEv.type = h.replace(/^on/, '').toLowerCase();
+                            props[h](fakeEv);
+                            return h; // welcher Handler hat es geschafft
+                        }
+                    }
+                }
+                fiber = fiber.return;
+            }
+            return 'no-handler';
+        }
+    
+        async function typeChars(input, text) {
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            input.focus();
+    
+            // Schneller Versuch: ganzen Text auf einmal setzen
+            setter.call(input, text);
+            input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertText', data: text }));
+            input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            await sleep(150);
+    
+            // Falls keine Optionen → char-by-char Fallback
+            const parent = input.closest('[role="dialog"]') || input.closest('[role="listbox"]')?.parentElement;
+            const hasOptions = parent?.querySelector('[role="listbox"] [role="option"]');
+            if (!hasOptions) {
+                setter.call(input, '');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                await sleep(20);
+                for (const char of text) {
+                    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: char, keyCode: char.charCodeAt(0) }));
+                    setter.call(input, input.value + char);
+                    input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertText', data: char }));
+                    input.dispatchEvent(new InputEvent('input',       { bubbles: true, inputType: 'insertText', data: char }));
+                    input.dispatchEvent(new KeyboardEvent('keyup',   { bubbles: true, key: char }));
+                    await sleep(25);
+                }
+            }
+        }
+    
+        async function pickDropdown(buttonId, searchText, optionText) {
+            const btn = await waitFor(() =>
+                document.querySelector('.cti-folder-search-modal #' + buttonId) ||
+                document.querySelector('#' + buttonId),
+            3000);
+            if (!btn) { badge('❌ ' + buttonId + ' nicht gefunden', '#ef4444'); return false; }
+    
+            badge('🔍 ' + buttonId + ' öffne...', '#f59e0b');
+    
+            const handler = reactTrigger(btn);
+            badge('⚡ handler: ' + handler, '#8b5cf6');
+            await sleep(100);
+    
+            // Dialog check
+            const dialog = await waitFor(() => {
+                // Alle möglichen offenen Dialogs
+                for (const d of document.querySelectorAll('[role="dialog"]')) {
+                    if (d.getAttribute('data-open') === 'true' && d.querySelector('input[role="combobox"]')) return d;
+                    if (d.getAttribute('aria-hidden') === 'false' && d.querySelector('input[role="combobox"]')) return d;
+                }
+                return null;
+            }, 3000);
+    
+            if (!dialog) {
+                badge('⚠️ kein Dropdown — handler war: ' + handler, '#ef4444');
+                // Fallback: dispatchEvent mousedown + click mit detail:1
+                badge('🔁 fallback mousedown+click...', '#f59e0b');
+                btn.dispatchEvent(new MouseEvent('mousedown', { bubbles:true, cancelable:true, detail:1, button:0 }));
+                await sleep(100);
+                btn.dispatchEvent(new MouseEvent('mouseup',   { bubbles:true, cancelable:true, detail:1, button:0 }));
+                await sleep(100);
+                btn.dispatchEvent(new MouseEvent('click',     { bubbles:true, cancelable:true, detail:1, button:0 }));
+                await sleep(350);
+    
+                const d2 = await waitFor(() => {
+                    for (const d of document.querySelectorAll('[role="dialog"]')) {
+                        if (d.getAttribute('data-open') === 'true' && d.querySelector('input[role="combobox"]')) return d;
+                    }
+                    return null;
+                }, 2000);
+    
+                if (!d2) { badge('❌ Dropdown öffnet nicht — bitte manuell öffnen', '#ef4444'); return false; }
+            }
+    
+            const activeDialog = dialog || document.querySelector('[role="dialog"][data-open="true"]');
+            const combobox = activeDialog.querySelector('input[role="combobox"]');
+            if (!combobox) { badge('❌ kein Eingabefeld', '#ef4444'); return false; }
+    
+            badge('✍️ tippe: ' + searchText, '#3b82f6');
+            await typeChars(combobox, searchText);
+            await sleep(800);
+    
+            const option = await waitFor(() => {
+                const lb = activeDialog.querySelector('[role="listbox"]');
+                if (!lb) return null;
+                const opts = [...lb.querySelectorAll('[role="option"]')];
+                // exakter Match zuerst, dann includes
+                return opts.find(el => el.textContent.trim().toLowerCase() === optionText.toLowerCase())
+                    || opts.find(el => el.textContent.trim().toLowerCase().includes(optionText.toLowerCase()));
+            }, 6000);
+    
+            if (!option) {
+                const visible = [...(activeDialog.querySelector('[role="listbox"]')?.querySelectorAll('[role="option"]') || [])]
+                    .map(e => e.textContent.trim()).slice(0, 5).join(', ');
+                badge('❌ "' + optionText + '" fehlt. Gefunden: ' + visible, '#ef4444');
+                return false;
+            }
+    
+            // Keyboard-Auswahl: awsui prüft isTrusted NICHT bei Keyboard-Events (Accessibility)
+            // ArrowDown bis zur richtigen Option, dann Enter
+            badge('⌨️ keyboard select: ' + optionText, '#3b82f6');
+            const listbox = activeDialog.querySelector('[role="listbox"]');
+            const allOptions = [...listbox.querySelectorAll('[role="option"]')];
+            const targetIdx = allOptions.indexOf(option);
+    
+            // Erst ArrowDown n-mal um auf die richtige Option zu navigieren
+            for (let i = 0; i <= targetIdx; i++) {
+                combobox.dispatchEvent(new KeyboardEvent('keydown', {
+                    bubbles: true, key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40
+                }));
+                await sleep(20);
+            }
+            // Enter zum Auswählen
+            combobox.dispatchEvent(new KeyboardEvent('keydown', {
+                bubbles: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13
+            }));
+            await sleep(50);
+            badge('✓ ' + optionText + ' gesetzt', '#22c55e');
+            return true;
+        }
+    
+        async function forwardToIT() {
+            badge('⏳ starte...', '#3b82f6');
+    
+            const ctiContainer = document.querySelector('.display-mode.is-editable:has(dl.info-pair.category)');
+            if (ctiContainer) {
+                const editBtn = ctiContainer.querySelector('.mode-change-trigger.edit-label');
+                (editBtn || ctiContainer).click();
+                await sleep(600);
+            }
+    
+            const modal = await waitFor(() => document.querySelector('.cti-folder-search-modal'), 6000);
+            if (!modal) { badge('❌ CTI Modal nicht erschienen', '#ef4444'); return; }
+    
+            badge('✓ Modal offen', '#22c55e');
+            await sleep(150);
+    
+            if (!await pickDropdown('category-selector', 'OpsTechIT', 'OpsTechIT')) return;
+            await sleep(50);
+            if (!await pickDropdown('type-selector', 'Client Devices', 'Client Devices')) return;
+            await sleep(50);
+            await pickDropdown('item-selector', 'Other', 'Other');
+    
+            setTimeout(badgeHide, 3000);
+        }
+
+    // Alt+5 — Forward to IT (CTI: OpsTechIT / Client Devices / Other)
+    window.addEventListener('keydown', e => {
+        if (e.altKey && (e.key === '5' || e.keyCode === 53)) {
+            e.preventDefault();
+            e.stopPropagation();
+            forwardToIT();
+        }
+    }, true);
+
 })();
