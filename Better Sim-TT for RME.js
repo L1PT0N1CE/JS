@@ -901,7 +901,7 @@
         }
 
     // Alt+5 — Forward to IT (CTI: OpsTechIT / Client Devices / Other)
-    window.addEventListener('keydown', e => {
+    unsafeWindow.addEventListener('keydown', e => {
         if (e.altKey && (e.key === '5' || e.keyCode === 53)) {
             e.preventDefault();
             e.stopPropagation();
