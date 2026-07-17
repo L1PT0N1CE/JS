@@ -150,26 +150,6 @@
                 d.appendChild(it);
             });
         }
-        const liveWrap=mk('div','',`padding:7px 14px;color:#3a5a8a;font-size:12px;font-style:italic;`);liveWrap.textContent='⏳ Suche in EAM…';d.appendChild(liveWrap);
-        clearTimeout(_deb);
-        _deb=setTimeout(async()=>{
-            if(!activeDrop)return;
-            const res=await searchEAM('', q); // autocomplete: als Beschreibungs-Suche
-            liveWrap.innerHTML='';
-            const used=new Set(local.map(e=>e.part));
-            const fresh=res.filter(r=>!used.has(r.part));
-            if(!fresh.length){liveWrap.style.cssText='padding:5px 14px;color:#334;font-size:12px;font-style:italic;';liveWrap.textContent=res.length?'Alle EAM-Treffer schon lokal.':'Keine weiteren EAM-Treffer.';return;}
-            const lbl2=mk('div','',`padding:3px 12px;background:#111820;color:#3a5a8a;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;`);lbl2.textContent=`EAM Catalog — ${fresh.length} Treffer`;liveWrap.appendChild(lbl2);
-            fresh.forEach(r=>{
-                const stk=parseInt(r.stock)||0;
-                const it=mk('div','',`padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e2a3a;display:flex;justify-content:space-between;align-items:center;`);
-                it.innerHTML=`<span><span style="color:#6ba3e8;font-weight:700;font-family:monospace;">${r.part}</span><span style="color:#7a8aaa;margin-left:10px;font-size:12px;">${r.desc}</span></span><span style="display:flex;gap:6px;align-items:center;">${r.stock!==''?`<span style="padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;background:${stk>0?'#1a3a2a':'#3a1a1a'};color:${stk>0?'#4cce7a':'#e05555'};">${stk} Stk</span>`:''}<span style="padding:1px 5px;border-radius:3px;font-size:10px;background:#1a2a3a;color:#4a7ab5;font-weight:600;">EAM</span></span>`;
-                it.addEventListener('mouseenter',()=>it.style.background='#232d3f');
-                it.addEventListener('mouseleave',()=>it.style.background='');
-                it.addEventListener('mousedown',ev=>{ev.stopImmediatePropagation();ev.preventDefault();selectPart(input,r.part);},true);
-                liveWrap.appendChild(it);
-            });
-        },350);
     }
 
     function selectPart(input,part){
@@ -449,7 +429,7 @@
     const sty=document.createElement('style');
     sty.textContent='#pc-ac::-webkit-scrollbar,#pc-overlay *::-webkit-scrollbar{width:5px}#pc-ac::-webkit-scrollbar-track,#pc-overlay *::-webkit-scrollbar-track{background:#0f1520}#pc-ac::-webkit-scrollbar-thumb,#pc-overlay *::-webkit-scrollbar-thumb{background:#2a3a55;border-radius:3px}#pc-overlay input::placeholder{color:#334!important}';
     document.head.appendChild(sty);
-    document.addEventListener('input',e=>{const i=e.target;if(i.name!=='partcode'||editorOpen)return;if(i.value.length>=1)showDrop(i,i.value);else removeDrop();},true);
+    document.addEventListener('input',e=>{const i=e.target;if(i.name!=='partcode'||i.readOnly||i.disabled||editorOpen)return;if(i.value.length>=1)showDrop(i,i.value);else removeDrop();},true);
     document.addEventListener('click',e=>{if(editorOpen)return;if(activeDrop&&!activeDrop.contains(e.target)&&e.target!==activeInp)removeDrop();});
     document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')removeDrop();},true);
     function init(){injectBtn();setTimeout(injectBtn,1000);setTimeout(injectBtn,3000);}
