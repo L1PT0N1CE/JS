@@ -158,35 +158,41 @@
     }
 
     function clickEamBookButton() {
-        // EAM uses uft-id-* class pattern for action buttons (same as uft-id-yes in Section 7)
-        const byUftId = document.querySelector('a.uft-id-book, a[class*="uft-id-book"]');
-        if (byUftId && byUftId.offsetParent !== null) {
-            byUftId.click();
-            return true;
-        }
-
-        // ExtJS: scan all visible buttons for "Book" / "Buchen" text
-        if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
-            const btns = Ext.ComponentQuery.query('button');
-            for (const btn of btns) {
-                const txt = (btn.text || btn.tooltip || '').toLowerCase();
-                if ((txt === 'book' || txt === 'buchen') && btn.isVisible && btn.isVisible() && !btn.isDisabled()) {
-                    btn.fireEvent ? btn.fireEvent('click', btn) : btn.el.dom.click();
-                    return true;
-                }
-            }
-        }
-
-        // DOM fallback: any visible button whose text is "Book" or "Buchen"
-        for (const el of document.querySelectorAll('.x-btn')) {
-            const t = (el.innerText || '').trim().toLowerCase();
-            if ((t === 'book' || t === 'buchen') && el.offsetParent !== null) {
+        // EAM toolbar save/book is the green save icon — uft-id-save is the standard EAM save action
+        // Try all known uft-id patterns for this button
+        const uftCandidates = ['save', 'book', 'booklabor', 'add', 'accept'];
+        for (const id of uftCandidates) {
+            const el = document.querySelector(`a.uft-id-${id}`);
+            if (el && el.offsetParent !== null && !el.closest('.x-item-disabled')) {
                 el.click();
+                console.log('[APM-GOD] Book via uft-id-' + id);
                 return true;
             }
         }
 
-        console.warn('[APM-GOD] EAM Book-Button nicht gefunden');
+        // ExtJS: find the first enabled toolbar button (save icon has no text, just icon class)
+        if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
+            // Look for toolbar button with save-related iconCls or action
+            const toolbars = Ext.ComponentQuery.query('toolbar');
+            for (const tb of toolbars) {
+                if (!tb.isVisible || !tb.isVisible()) continue;
+                const btns = tb.query('button');
+                for (const btn of btns) {
+                    const icon  = (btn.iconCls  || '').toLowerCase();
+                    const iid   = (btn.itemId   || '').toLowerCase();
+                    const tt    = (btn.tooltip  || '').toLowerCase();
+                    const txt   = (btn.text     || '').toLowerCase();
+                    if ((icon + iid + tt + txt).match(/save|book|accept|add/) && !btn.isDisabled()) {
+                        btn.el ? btn.el.dom.click() : btn.fireEvent('click', btn);
+                        console.log('[APM-GOD] Book via ExtJS btn', btn.itemId || btn.iconCls);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        console.warn('[APM-GOD] EAM Book-Button nicht gefunden — alle a[class*=uft-id]:');
+        document.querySelectorAll('a[class*="uft-id"]').forEach(a => console.log(a.className));
         return false;
     }
 
