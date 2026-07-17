@@ -2,7 +2,7 @@
     'use strict';
 
     // ═══════════════════════════════════════════════════════
-    // PARTNUMMER-DATENBANK
+    // PARTNUMMER-DATENBANK (lokal, sofort, kein Netz nötig)
     // ═══════════════════════════════════════════════════════
     const STORAGE_KEY = 'partcodeMap_v3';
 
@@ -52,26 +52,138 @@
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) return JSON.parse(stored);
-        } catch (e) {
-            console.warn('[Partcode] Fehler beim Laden:', e);
-        }
+        } catch (e) {}
         return JSON.parse(JSON.stringify(defaultPartcodeMap));
     }
-
     function savePartcodeMap(map) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-            return true;
-        } catch (e) {
-            console.error('[Partcode] Fehler beim Speichern:', e);
-            return false;
-        }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); return true; } catch(e) { return false; }
     }
-
     let partcodeMap = loadPartcodeMap();
 
     // ═══════════════════════════════════════════════════════
-    // AUTOCOMPLETE LOGIK
+    // EAM SESSION (für Live-Suche)
+    // ═══════════════════════════════════════════════════════
+    function getEamSession() {
+        // 1) aus iframe src (zuverlässigste Quelle)
+        const iframe = document.querySelector('iframe[src*="eamid="]');
+        if (iframe) {
+            try {
+                const p = new URL(iframe.src).searchParams;
+                const eamid = p.get('eamid'), tenant = p.get('tenant');
+                if (eamid) return { eamid, tenant: tenant || 'AMAZONRMEEU_PRD' };
+            } catch(e) {}
+        }
+        // 2) aus EAM SessionStorage namespace
+        try {
+            const sess = window.EAM?.SessionStorage;
+            if (sess?.eamid) return { eamid: sess.eamid, tenant: sess.tenant || 'AMAZONRMEEU_PRD' };
+        } catch(e) {}
+        // 3) aus gAppData (Start Center)
+        try {
+            const ip = window.gAppData?.initparams || '';
+            const m = ip.match(/eamid=([^&]+)/);
+            if (m) return { eamid: m[1], tenant: 'AMAZONRMEEU_PRD' };
+        } catch(e) {}
+        return null;
+    }
+
+    function getBaseUrl() {
+        return `https://${window.location.hostname}/web/base/`;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // LIVE EAM SUCHE (SSPART.xmlhttp)
+    // ═══════════════════════════════════════════════════════
+    let _liveDebounceTimer = null;
+    let _liveAbort = null;
+
+    async function searchEAMLive(query) {
+        const sess = getEamSession();
+        if (!sess) return [];
+
+        if (_liveAbort) _liveAbort.abort();
+        _liveAbort = new AbortController();
+
+        const q = query.trim();
+        // MADDON_FILTER: partcode CONTAINS q  OR  partdescription CONTAINS q
+        const params = new URLSearchParams({
+            GRID_ID:                        '80',
+            GRID_NAME:                      'SSPART',
+            DATASPY_ID:                     '101466',
+            USER_FUNCTION_NAME:             'SSPART',
+            SYSTEM_FUNCTION_NAME:           'SSPART',
+            CURRENT_TAB_NAME:               'LST',
+            COMPONENT_INFO_TYPE:            'DATA_ONLY',
+            FORCE_REQUERY:                  'YES',
+            MAX_ROWS:                       '30',
+            NUMBER_OF_ROWS_FIRST_RETURNED:  '30',
+            eamid:                          sess.eamid,
+            tenant:                         sess.tenant,
+            // Filter 1: partcode CONTAINS q (OR)
+            MADDON_FILTER_ALIAS_NAME_1:     'partcode',
+            MADDON_FILTER_OPERATOR_1:       'CONTAINS',
+            MADDON_FILTER_VALUE_1:          q,
+            MADDON_FILTER_SEQNUM_1:         '1',
+            MADDON_FILTER_JOINER_1:         'OR',
+            MADDON_LPAREN_1:                'true',
+            MADDON_RPAREN_1:                'false',
+            // Filter 2: partdescription CONTAINS q (end of OR group)
+            MADDON_FILTER_ALIAS_NAME_2:     'partdescription',
+            MADDON_FILTER_OPERATOR_2:       'CONTAINS',
+            MADDON_FILTER_VALUE_2:          q,
+            MADDON_FILTER_SEQNUM_2:         '2',
+            MADDON_FILTER_JOINER_2:         'AND',
+            MADDON_LPAREN_2:                'false',
+            MADDON_RPAREN_2:                'true',
+        });
+
+        try {
+            const resp = await fetch(getBaseUrl() + 'SSPART.xmlhttp', {
+                method:      'POST',
+                headers:     { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                body:        params.toString(),
+                credentials: 'include',
+                signal:      _liveAbort.signal
+            });
+            const text = await resp.text();
+            const json = JSON.parse(text);
+            const meta = json?.pageData?.grid?.GRIDRESULT?.GRID?.METADATA?.COLUMN || [];
+            const data = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA || [];
+
+            // Spalten-Index einmalig aufbauen
+            const colIdx = {};
+            (Array.isArray(meta) ? meta : [meta]).forEach((col, i) => {
+                const name = col?.ALIAS_NAME || col?.COLUMN_NAME || '';
+                colIdx[name.toLowerCase()] = i;
+            });
+
+            return data.map(row => {
+                const arr = Array.isArray(row) ? row : Object.values(row);
+                const get = (name) => arr[colIdx[name.toLowerCase()]] ?? '';
+                return {
+                    part:  get('partcode'),
+                    desc:  get('partdescription'),
+                    stock: get('par_currbal') || get('instock') || '',
+                    // Foto-URL wenn vorhanden (braucht documentcode Feld)
+                    imgCode: get('documentcode') || get('imagecode') || '',
+                };
+            }).filter(r => r.part);
+        } catch(e) {
+            if (e.name !== 'AbortError') console.warn('[Partcode Live] Fehler:', e);
+            return [];
+        }
+    }
+
+    function getPartImgUrl(docCode) {
+        if (!docCode) return null;
+        const sess = getEamSession();
+        if (!sess) return null;
+        // EAM Dokument-Viewer — selbes Prinzip wie APM Master
+        return `${getBaseUrl()}VIEWUDOC?documentcode=${encodeURIComponent(docCode)}&keepcontenttype=true&eamid=${sess.eamid}&tenant=${sess.tenant}`;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // DROPDOWN
     // ═══════════════════════════════════════════════════════
     let activeDropdown = null;
     let activeInput    = null;
@@ -83,20 +195,12 @@
         const dropdown = document.createElement('div');
         dropdown.id    = 'partcode-autocomplete';
         dropdown.style.cssText = `
-            position: fixed;
-            top: ${rect.bottom + window.scrollY}px;
-            left: ${rect.left + window.scrollX}px;
-            width: ${rect.width}px;
-            max-height: 300px;
-            overflow-y: auto;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-top: none;
-            border-radius: 0 0 4px 4px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            z-index: 999999;
-            font-family: Arial, sans-serif;
-            font-size: 13px;
+            position:fixed; top:${rect.bottom}px; left:${rect.left}px;
+            width:${Math.max(rect.width, 480)}px; max-height:360px;
+            overflow-y:auto; background:#fff; border:1px solid #ccc;
+            border-top:none; border-radius:0 0 4px 4px;
+            box-shadow:0 4px 12px rgba(0,0,0,.18);
+            z-index:999999; font-family:Arial,sans-serif; font-size:13px;
         `;
         activeDropdown = dropdown;
         activeInput    = input;
@@ -105,628 +209,333 @@
     }
 
     function removeDropdown() {
-        if (activeDropdown) {
-            activeDropdown.remove();
-            activeDropdown = null;
-            activeInput    = null;
-        }
+        if (activeDropdown) { activeDropdown.remove(); activeDropdown = null; activeInput = null; }
+        clearTimeout(_liveDebounceTimer);
     }
 
-    function populateDropdown(input, query) {
+    function makeSectionLabel(text) {
+        const d = document.createElement('div');
+        d.style.cssText = 'padding:4px 12px; background:#f0f4ff; color:#1565c0; font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; user-select:none;';
+        d.textContent = text;
+        return d;
+    }
+
+    function makeItem(part, desc, stock, imgCode, isLive) {
+        const item = document.createElement('div');
+        item.className = 'partcode-item';
+        item.dataset.part = part;
+        item.style.cssText = 'padding:7px 12px; cursor:pointer; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:8px; user-select:none;';
+        item.addEventListener('mouseenter', () => item.style.backgroundColor = '#e3f2fd');
+        item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
+        item.addEventListener('mousedown', (e) => {
+            e.stopImmediatePropagation(); e.preventDefault();
+            if (activeInput) selectPartcode(activeInput, part);
+        }, true);
+
+        const left = document.createElement('span');
+        left.innerHTML = isLive
+            ? `<span style="color:#1976d2; font-weight:600;">${part}</span> <span style="color:#555; margin-left:6px;">${desc}</span>`
+            : `<strong style="color:#1976d2;">${part}</strong> <span style="color:#666; margin-left:6px;">${desc}</span>`;
+
+        const right = document.createElement('span');
+        right.style.cssText = 'display:flex; align-items:center; gap:8px; flex-shrink:0;';
+        if (stock !== '') {
+            const s = document.createElement('span');
+            s.style.cssText = `padding:1px 6px; border-radius:3px; font-size:11px; font-weight:600; background:${Number(stock) > 0 ? '#e8f5e9' : '#fce4ec'}; color:${Number(stock) > 0 ? '#2e7d32' : '#c62828'};`;
+            s.textContent = `Lager: ${stock}`;
+            right.appendChild(s);
+        }
+        if (imgCode) {
+            const img = document.createElement('img');
+            img.src = getPartImgUrl(imgCode);
+            img.style.cssText = 'width:32px; height:32px; object-fit:contain; border:1px solid #ddd; border-radius:3px;';
+            img.onerror = () => img.remove();
+            right.appendChild(img);
+        }
+
+        item.appendChild(left);
+        item.appendChild(right);
+        return item;
+    }
+
+    async function populateDropdown(input, query) {
         const dropdown = createDropdown(input);
-        const q        = query.toLowerCase().trim();
+        const q = query.toLowerCase().trim();
 
-        const matches = partcodeMap.filter(entry => {
-            return entry.key.toLowerCase().includes(q)
-                || entry.desc.toLowerCase().includes(q)
-                || entry.part.toLowerCase().includes(q);
-        });
+        // 1) Lokale Treffer sofort anzeigen
+        const localMatches = partcodeMap.filter(e =>
+            e.key.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q) || e.part.toLowerCase().includes(q)
+        );
 
-        if (matches.length === 0) {
-            const empty = document.createElement('div');
-            empty.style.cssText = 'padding: 10px; color: #999; font-style: italic;';
-            empty.textContent   = 'Keine Treffer...';
-            dropdown.appendChild(empty);
-            return;
+        if (localMatches.length > 0) {
+            dropdown.appendChild(makeSectionLabel('Meine Datenbank'));
+            localMatches.forEach(e => dropdown.appendChild(makeItem(e.part, `${e.key} — ${e.desc}`, '', '', false)));
         }
 
-        matches.forEach((entry) => {
-            const item         = document.createElement('div');
-            item.className     = 'partcode-item';
-            item.dataset.key   = entry.key;
-            item.dataset.part  = entry.part;
-            item.style.cssText = `
-                padding: 8px 12px;
-                cursor: pointer;
-                border-bottom: 1px solid #eee;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                user-select: none;
-            `;
-            item.addEventListener('mouseenter', () => item.style.backgroundColor = '#e3f2fd');
-            item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
-            item.addEventListener('mousedown', (e) => {
-                e.stopImmediatePropagation();
-                e.preventDefault();
-                if (activeInput) selectPartcode(activeInput, item.dataset.key, item.dataset.part);
-            }, true);
-            item.innerHTML = `
-                <span>
-                    <strong style="color: #1976d2;">${entry.key}</strong>
-                    <span style="color: #666; margin-left: 8px;">${entry.desc}</span>
-                </span>
-                <span style="color: #888; font-size: 11px; font-family: monospace;">${entry.part}</span>
-            `;
-            dropdown.appendChild(item);
-        });
-    }
+        // Live-Suche-Platzhalter
+        const liveSection = document.createElement('div');
+        liveSection.innerHTML = '<div style="padding:8px 12px; color:#888; font-style:italic; font-size:12px;">⏳ EAM wird durchsucht…</div>';
+        dropdown.appendChild(liveSection);
 
-    // ═══════════════════════════════════════════════════════
-    // EDITOR BUTTON
-    // ═══════════════════════════════════════════════════════
-    function injectEditorButton() {
-        const acceptedTitles = [
-  'Part Details & Planning',
-  'Teiledetails und Planung'
-];
+        // 2) Debounced live search
+        clearTimeout(_liveDebounceTimer);
+        _liveDebounceTimer = setTimeout(async () => {
+            if (!activeDropdown) return;
+            const liveResults = await searchEAMLive(q);
 
-const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el =>
-  acceptedTitles.includes(el.textContent.trim())
-);
-
-        if (!titleEl) return;
-        if (titleEl.querySelector('#partcode-editor-btn')) return;
-
-        const wrapper = document.createElement('span');
-        wrapper.style.cssText = `
-            display: inline-flex !important;
-            align-items: center;
-            white-space: nowrap;
-        `;
-
-        const originalText  = titleEl.textContent;
-        titleEl.textContent = '';
-
-        const textSpan          = document.createElement('span');
-        textSpan.textContent    = originalText;
-        textSpan.style.cssText  = 'display: inline;';
-        wrapper.appendChild(textSpan);
-
-        const btn    = document.createElement('span');
-        btn.id       = 'partcode-editor-btn';
-        btn.title    = 'Partcodes verwalten (' + partcodeMap.length + ' Einträge)';
-        btn.style.cssText = `
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-            background: #1976d2;
-            color: white;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 11px;
-            margin-left: 6px;
-            flex-shrink: 0;
-            user-select: none;
-            transition: background 0.2s;
-        `;
-        btn.innerHTML = '⚙️';
-        btn.addEventListener('mouseenter', () => btn.style.background = '#1565c0');
-        btn.addEventListener('mouseleave', () => btn.style.background = '#1976d2');
-        btn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            removeDropdown();
-
-            // ✅ Partcode-Textfeld leeren beim Öffnen
-            const partcodeInput = document.querySelector('input[name="partcode"]');
-            if (partcodeInput) {
-                partcodeInput.value = '';
-                partcodeInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-
-            openEditor();
-        });
-
-        wrapper.appendChild(btn);
-        titleEl.appendChild(wrapper);
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // EDITOR HILFSFUNKTIONEN
-    // ═══════════════════════════════════════════════════════
-    let currentEditorList = null;
-
-    function editorRefreshList(container, scrollToBottom = false) {
-        container.innerHTML = '';
-
-        // ✅ Einträge MIT Key alphabetisch, leere Einträge ans Ende
-        const withKey    = partcodeMap.filter(e => e.key.trim() !== '');
-        const withoutKey = partcodeMap.filter(e => e.key.trim() === '');
-        const sorted     = [
-            ...withKey.sort((a, b) => a.key.localeCompare(b.key)),
-            ...withoutKey
-        ];
-
-        if (sorted.length === 0) {
-            container.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Keine Einträge vorhanden</div>';
-            return;
-        }
-
-        sorted.forEach((entry) => {
-            const realIndex    = partcodeMap.indexOf(entry);
-            const row          = document.createElement('div');
-            row.dataset.index  = realIndex;
-            row.style.cssText  = `
-                display: flex;
-                align-items: center;
-                padding: 10px 20px;
-                border-bottom: 1px solid #f0f0f0;
-                gap: 8px;
-            `;
-
-            const keyInput  = createInlineInput(entry.key,  '130px', 'Alias', true);
-            const partInput = createInlineInput(entry.part, '110px', 'Partnumber', false);
-            const descInput = createInlineInput(entry.desc, '160px', 'Beschreibung', false);
-            const saveBtn   = createIconButton('💾', '#28a745', 'Speichern');
-            const delBtn    = createIconButton('🗑️', '#dc3545', 'Löschen');
-
-            saveBtn.onclick = () => {
-                const newKey  = keyInput.value.trim();
-                const newPart = partInput.value.trim();
-                const newDesc = descInput.value.trim();
-                if (!newKey || !newPart) {
-                    alert('Alias und Partnumber sind Pflicht!');
-                    return;
-                }
-                const idx        = parseInt(row.dataset.index);
-                partcodeMap[idx] = { key: newKey, part: newPart, desc: newDesc };
-                savePartcodeMap(partcodeMap);
-                editorRefreshList(container);
-                showToast('✅ Gespeichert!');
-            };
-
-            delBtn.onclick = () => {
-                if (confirm(`"${entry.key}" wirklich löschen?`)) {
-                    const idx = parseInt(row.dataset.index);
-                    partcodeMap.splice(idx, 1);
-                    savePartcodeMap(partcodeMap);
-                    editorRefreshList(container);
-                    showToast('🗑️ Gelöscht!');
-                }
-            };
-
-            // ✅ Neuer leerer Eintrag visuell hervorheben
-            if (entry.key.trim() === '' && entry.part.trim() === '') {
-                row.style.background      = '#fffde7';
-                keyInput.style.borderColor = '#ffc107';
-            }
-
-            row.appendChild(keyInput);
-            row.appendChild(partInput);
-            row.appendChild(descInput);
-            row.appendChild(saveBtn);
-            row.appendChild(delBtn);
-            container.appendChild(row);
-        });
-
-        if (scrollToBottom) {
-            requestAnimationFrame(() => {
-                container.scrollTop = container.scrollHeight;
-            });
-        }
-    }
-
-    function editorSaveAll(container) {
-        const rows   = container.querySelectorAll('div[data-index]');
-        const newMap = [];
-        let errorFound = false;
-
-        rows.forEach(row => {
-            const inputs  = row.querySelectorAll('input');
-            const newKey  = inputs[0].value.trim();
-            const newPart = inputs[1].value.trim();
-            const newDesc = inputs[2].value.trim();
-
-            if (!newKey || !newPart) {
-                inputs[0].style.borderColor = !newKey  ? '#dc3545' : '#ddd';
-                inputs[1].style.borderColor = !newPart ? '#dc3545' : '#ddd';
-                errorFound = true;
+            liveSection.innerHTML = '';
+            if (liveResults.length === 0) {
+                liveSection.innerHTML = '<div style="padding:6px 12px; color:#aaa; font-size:12px; font-style:italic;">Keine weiteren EAM-Treffer.</div>';
                 return;
             }
 
-            newMap.push({ key: newKey, part: newPart, desc: newDesc });
-        });
+            // Duplikate mit lokaler DB rausfiltern
+            const localParts = new Set(localMatches.map(e => e.part));
+            const newOnes    = liveResults.filter(r => !localParts.has(r.part));
 
-        if (errorFound) {
-            showToast('⚠️ Alias & Partnumber dürfen nicht leer sein!');
-            return;
-        }
-
-        partcodeMap = newMap;
-        savePartcodeMap(partcodeMap);
-        editorRefreshList(container);
-        showToast('✅ Alle Einträge gespeichert!');
-    }
-
-    function editorAddNewEntry() {
-        if (!currentEditorList) return;
-        // ✅ Leeren Eintrag pushen, landet automatisch am Ende der sortierten Liste
-        partcodeMap.push({ key: '', part: '', desc: '' });
-        editorRefreshList(currentEditorList, true);
-
-        setTimeout(() => {
-            const inputs       = currentEditorList.querySelectorAll('input');
-            const lastKeyInput = inputs[inputs.length - 3];
-            if (lastKeyInput) {
-                lastKeyInput.focus();
-                lastKeyInput.select();
-                lastKeyInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            if (newOnes.length > 0) {
+                liveSection.appendChild(makeSectionLabel('EAM Parts Catalog (live)'));
+                newOnes.forEach(r => liveSection.appendChild(makeItem(r.part, r.desc, r.stock, r.imgCode, true)));
+            } else {
+                liveSection.innerHTML = '<div style="padding:6px 12px; color:#aaa; font-size:12px; font-style:italic;">Alle EAM-Treffer schon in lokaler DB.</div>';
             }
-        }, 50);
+        }, 350);
     }
 
     // ═══════════════════════════════════════════════════════
-    // INLINE EDITOR
+    // PART AUSWÄHLEN
     // ═══════════════════════════════════════════════════════
-    function openEditor() {
-        if (isEditorOpen) return;
-        isEditorOpen = true;
-
-        const existing = document.getElementById('partcode-editor-overlay');
-        if (existing) existing.remove();
-
-        const overlay    = document.createElement('div');
-        overlay.id       = 'partcode-editor-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: Arial, sans-serif;
-        `;
-
-        const panel = document.createElement('div');
-        panel.style.cssText = `
-            background: #fff;
-            border-radius: 8px;
-            width: 650px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        `;
-
-        const header = document.createElement('div');
-        header.style.cssText = `
-            padding: 16px 20px;
-            border-bottom: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        `;
-        header.innerHTML = `
-            <h2 style="margin: 0; font-size: 18px; color: #333;">🔧 Partnumber Editor</h2>
-            <span style="color: #666; font-size: 12px;">${partcodeMap.length} Einträge</span>
-        `;
-
-        const toolbar = document.createElement('div');
-        toolbar.style.cssText = `
-            padding: 12px 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-        `;
-
-        const addBtn     = createToolbarButton('➕ New',      '#28a745');
-        const saveAllBtn = createToolbarButton('💾 Save All', '#1976d2');
-        const importBtn  = createToolbarButton('📥 Import',   '#6c757d');
-        const exportBtn  = createToolbarButton('📤 Export',   '#6c757d');
-        const resetBtn   = createToolbarButton('🔄 Reset',    '#dc3545');
-
-        addBtn.onclick     = () => editorAddNewEntry();
-        saveAllBtn.onclick = () => editorSaveAll(listContainer);
-        importBtn.onclick  = () => importJSON();
-        exportBtn.onclick  = () => exportJSON();
-        resetBtn.onclick   = () => {
-            if (confirm('Alle Änderungen verwerfen und Standard wiederherstellen?')) {
-                localStorage.removeItem(STORAGE_KEY);
-                partcodeMap = JSON.parse(JSON.stringify(defaultPartcodeMap));
-                if (currentEditorList) editorRefreshList(currentEditorList);
+    function selectPartcode(input, partNumber) {
+        input.value = partNumber;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        try {
+            const cmpId = input.getAttribute('data-componentid');
+            if (cmpId && typeof Ext !== 'undefined') {
+                const cmp = Ext.getCmp(cmpId);
+                if (cmp?.setValue) cmp.setValue(partNumber);
             }
-        };
-
-        toolbar.appendChild(addBtn);
-        toolbar.appendChild(saveAllBtn);
-        toolbar.appendChild(importBtn);
-        toolbar.appendChild(exportBtn);
-        toolbar.appendChild(resetBtn);
-
-        const listContainer = document.createElement('div');
-        listContainer.style.cssText = `
-            overflow-y: auto;
-            flex: 1;
-            padding: 0;
-        `;
-
-        currentEditorList = listContainer;
-
-        const footer = document.createElement('div');
-        footer.style.cssText = `
-            padding: 12px 20px;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #f8f9fa;
-            border-radius: 0 0 8px 8px;
-        `;
-
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Schließen';
-        closeBtn.style.cssText = `
-            padding: 8px 20px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        `;
-        closeBtn.onclick = () => {
-            isEditorOpen      = false;
-            currentEditorList = null;
-            overlay.remove();
-        };
-
-        const hint = document.createElement('span');
-        hint.style.cssText = 'color: #666; font-size: 12px; display: flex; align-items: center; gap: 8px;';
-        hint.innerHTML = `
-            VERGISS NICHT ZU SPEICHERN DU HOND
-            <a href="https://amazondeu-my.sharepoint.com/:x:/r/personal/kanataza_amazon_de/Documents/Spareparts%20by%20Azad%20Kanat%20%26%20Co.xlsx?d=w6898e9f8051f4f8fb18dda1fa38c271b&csf=1&web=1&e=bWpnWq"
-               target="_blank"
-               style="
-                   color: #1976d2;
-                   text-decoration: none;
-                   font-size: 12px;
-                   font-weight: 600;
-                   padding: 2px 7px;
-                   border: 1px solid #1976d2;
-                   border-radius: 3px;
-                   background: #e3f2fd;
-                   white-space: nowrap;
-               "
-               onmouseover="this.style.background='#bbdefb'"
-               onmouseout="this.style.background='#e3f2fd'"
-            >📋 Azad's Sparepartliste</a>
-        `;
-
-        footer.appendChild(hint);
-        footer.appendChild(closeBtn);
-
-        panel.appendChild(header);
-        panel.appendChild(toolbar);
-        panel.appendChild(listContainer);
-        panel.appendChild(footer);
-        overlay.appendChild(panel);
-        document.body.appendChild(overlay);
-
-        editorRefreshList(listContainer);
+        } catch(e) {}
+        input.style.backgroundColor = '#d4edda';
+        input.style.transition = 'background-color 0.3s';
+        setTimeout(() => input.style.backgroundColor = '', 600);
+        removeDropdown();
+        setTimeout(() => setExtFieldValue('transactionquantity', '1'), 500);
     }
-
-    function createToolbarButton(text, color) {
-        const btn = document.createElement('button');
-        btn.textContent   = text;
-        btn.style.cssText = `
-            padding: 6px 12px;
-            background: ${color};
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-        `;
-        return btn;
-    }
-
-    function createIconButton(icon, color, title) {
-        const btn = document.createElement('button');
-        btn.textContent   = icon;
-        btn.title         = title;
-        btn.style.cssText = `
-            width: 32px;
-            height: 32px;
-            border: none;
-            background: ${color};
-            color: white;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        `;
-        return btn;
-    }
-
-    function createInlineInput(value, width, placeholder, forceLower = false) {
-        const input       = document.createElement('input');
-        input.value       = value;
-        input.placeholder = placeholder;
-        input.style.cssText = `
-            width: ${width};
-            padding: 6px 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-            font-family: monospace;
-            flex-shrink: 0;
-            ${forceLower ? 'text-transform: lowercase;' : ''}
-        `;
-
-        if (forceLower) {
-            input.addEventListener('input', () => {
-                const pos   = input.selectionStart;
-                input.value = input.value.toLowerCase();
-                input.setSelectionRange(pos, pos);
-            });
-        }
-
-        input.addEventListener('mousedown', (e) => e.stopPropagation(), true);
-        input.addEventListener('click',     (e) => e.stopPropagation(), true);
-        return input;
-    }
-
-    function exportJSON() {
-        const dataStr = JSON.stringify(partcodeMap, null, 2);
-        const blob    = new Blob([dataStr], { type: 'application/json' });
-        const url     = URL.createObjectURL(blob);
-        const a       = document.createElement('a');
-        a.href        = url;
-        a.download    = 'partcodes_export.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast('📤 Exportiert!');
-    }
-
-    function importJSON() {
-        const input  = document.createElement('input');
-        input.type   = 'file';
-        input.accept = '.json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader    = new FileReader();
-            reader.onload   = (event) => {
-                try {
-                    const imported = JSON.parse(event.target.result);
-                    let entries    = [];
-
-                    if (Array.isArray(imported)) {
-                        for (const item of imported) {
-                            if (typeof item !== 'object' || !item.key || !item.part) {
-                                throw new Error('Ungültiges Array-Format: jedes Element braucht "key" und "part"');
-                            }
-                        }
-                        entries = imported;
-                    } else {
-                        // ✅ Altes Objekt-Format konvertieren
-                        for (const [key, val] of Object.entries(imported)) {
-                            if (typeof val !== 'object' || !val.part) {
-                                throw new Error(`Ungültiges Format bei "${key}"`);
-                            }
-                            entries.push({ key, part: val.part, desc: val.desc || '' });
-                        }
-                    }
-
-                    if (confirm(`${entries.length} Einträge importieren?`)) {
-                        partcodeMap.push(...entries);
-                        savePartcodeMap(partcodeMap);
-                        if (currentEditorList) editorRefreshList(currentEditorList);
-                        showToast('📥 Import erfolgreich!');
-                    }
-                } catch (err) {
-                    alert('Fehler beim Import: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
-        };
-        input.click();
-    }
-
-    function showToast(msg) {
-        const toast       = document.createElement('div');
-        toast.textContent = msg;
-        toast.style.cssText = `
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #333;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 14px;
-            z-index: 1000001;
-            animation: slideUp 0.3s ease;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => {
-            toast.style.transition = 'opacity 0.3s';
-            toast.style.opacity    = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 2000);
-    }
-
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideUp {
-            from { transform: translateX(-50%) translateY(20px); opacity: 0; }
-            to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
 
     // ═══════════════════════════════════════════════════════
     // EXT HILFSFUNKTIONEN
     // ═══════════════════════════════════════════════════════
     function getExtComponent(name) {
         if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return null;
-        const cmps = Ext.ComponentQuery.query('[name="' + name + '"]');
-        return cmps && cmps.length > 0 ? cmps[0] : null;
+        const cmps = Ext.ComponentQuery.query(`[name="${name}"]`);
+        return cmps?.length ? cmps[0] : null;
     }
-
     function setExtFieldValue(name, value) {
         const cmp = getExtComponent(name);
-        if (!cmp) {
-            const input = document.querySelector('input[name="' + name + '"]');
-            if (input) {
-                input.value = value;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            return false;
-        }
-        if (cmp.setValue)   cmp.setValue(value);
-        if (cmp.fireEvent)  cmp.fireEvent('change', cmp, value);
-        const inputEl = document.querySelector('input[name="' + name + '"]');
-        if (inputEl) {
-            inputEl.style.backgroundColor = '#d4edda';
-            inputEl.style.transition      = 'background-color 0.3s';
-            setTimeout(() => inputEl.style.backgroundColor = '', 600);
-        }
-        return true;
+        if (cmp?.setValue) { cmp.setValue(value); cmp.fireEvent?.('change', cmp, value); return true; }
+        const input = document.querySelector(`input[name="${name}"]`);
+        if (input) { input.value = value; input.dispatchEvent(new Event('change', { bubbles: true })); }
+        return !!input;
     }
 
-    function autoFillQuantity() {
-        setExtFieldValue('transactionquantity', '1');
+    // ═══════════════════════════════════════════════════════
+    // EDITOR BUTTON (unverändert aus v4)
+    // ═══════════════════════════════════════════════════════
+    function injectEditorButton() {
+        const acceptedTitles = ['Part Details & Planning', 'Teiledetails und Planung'];
+        const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el => acceptedTitles.includes(el.textContent.trim()));
+        if (!titleEl || titleEl.querySelector('#partcode-editor-btn')) return;
+
+        const wrapper = document.createElement('span');
+        wrapper.style.cssText = 'display:inline-flex !important; align-items:center; white-space:nowrap;';
+        const orig = titleEl.textContent;
+        titleEl.textContent = '';
+        const textSpan = document.createElement('span');
+        textSpan.textContent = orig;
+        wrapper.appendChild(textSpan);
+
+        const btn = document.createElement('span');
+        btn.id = 'partcode-editor-btn';
+        btn.title = `Partcodes verwalten (${partcodeMap.length} Einträge)`;
+        btn.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; background:#1976d2; color:white; border-radius:3px; cursor:pointer; font-size:11px; margin-left:6px; user-select:none;';
+        btn.innerHTML = '⚙️';
+        btn.addEventListener('mouseenter', () => btn.style.background = '#1565c0');
+        btn.addEventListener('mouseleave', () => btn.style.background = '#1976d2');
+        btn.addEventListener('mousedown', (e) => {
+            e.preventDefault(); e.stopPropagation(); removeDropdown();
+            const pi = document.querySelector('input[name="partcode"]');
+            if (pi) { pi.value = ''; pi.dispatchEvent(new Event('change', { bubbles: true })); }
+            openEditor();
+        });
+        wrapper.appendChild(btn);
+        titleEl.appendChild(wrapper);
     }
 
-    function selectPartcode(input, key, partNumber) {
-        input.value = partNumber;
-        input.dispatchEvent(new Event('change', { bubbles: true, cancelable: false }));
-        try {
-            const cmpId = input.getAttribute('data-componentid');
-            if (cmpId && typeof Ext !== 'undefined' && Ext.getCmp) {
-                const cmp = Ext.getCmp(cmpId);
-                if (cmp && cmp.setValue) cmp.setValue(partNumber);
+    // ── Editor (identisch v4, kompakt) ──────────────────────────────────────
+    let currentEditorList = null;
+
+    function editorRefreshList(container, scrollToBottom = false) {
+        container.innerHTML = '';
+        const sorted = [
+            ...partcodeMap.filter(e => e.key.trim()).sort((a,b) => a.key.localeCompare(b.key)),
+            ...partcodeMap.filter(e => !e.key.trim())
+        ];
+        if (!sorted.length) { container.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">Keine Einträge</div>'; return; }
+        sorted.forEach(entry => {
+            const realIdx = partcodeMap.indexOf(entry);
+            const row = document.createElement('div');
+            row.dataset.index = realIdx;
+            row.style.cssText = 'display:flex; align-items:center; padding:10px 20px; border-bottom:1px solid #f0f0f0; gap:8px;';
+            if (!entry.key.trim() && !entry.part.trim()) { row.style.background = '#fffde7'; }
+            const ki = mkInput(entry.key, '130px', 'Alias', true);
+            const pi = mkInput(entry.part, '110px', 'Partnumber', false);
+            const di = mkInput(entry.desc, '160px', 'Beschreibung', false);
+            const sv = mkIconBtn('💾','#28a745','Speichern');
+            const dl = mkIconBtn('🗑️','#dc3545','Löschen');
+            sv.onclick = () => {
+                const nk = ki.value.trim(), np = pi.value.trim(), nd = di.value.trim();
+                if (!nk || !np) { alert('Alias & Partnumber sind Pflicht!'); return; }
+                partcodeMap[parseInt(row.dataset.index)] = { key: nk, part: np, desc: nd };
+                savePartcodeMap(partcodeMap); editorRefreshList(container); showToast('✅ Gespeichert!');
+            };
+            dl.onclick = () => {
+                if (confirm(`"${entry.key}" löschen?`)) {
+                    partcodeMap.splice(parseInt(row.dataset.index), 1);
+                    savePartcodeMap(partcodeMap); editorRefreshList(container); showToast('🗑️ Gelöscht!');
+                }
+            };
+            [ki,pi,di,sv,dl].forEach(el => row.appendChild(el));
+            container.appendChild(row);
+        });
+        if (scrollToBottom) requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+    }
+
+    function openEditor() {
+        if (isEditorOpen) return; isEditorOpen = true;
+        document.getElementById('partcode-editor-overlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'partcode-editor-overlay';
+        overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000000; display:flex; justify-content:center; align-items:center; font-family:Arial,sans-serif;';
+        const panel = document.createElement('div');
+        panel.style.cssText = 'background:#fff; border-radius:8px; width:650px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.3);';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'padding:16px 20px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center;';
+        header.innerHTML = `<h2 style="margin:0; font-size:18px; color:#333;">🔧 Partnumber Editor</h2><span style="color:#666; font-size:12px;">${partcodeMap.length} Einträge</span>`;
+
+        const toolbar = document.createElement('div');
+        toolbar.style.cssText = 'padding:12px 20px; background:#f8f9fa; border-bottom:1px solid #e0e0e0; display:flex; gap:8px; flex-wrap:wrap;';
+        const addBtn     = mkToolBtn('➕ New',      '#28a745');
+        const saveAllBtn = mkToolBtn('💾 Save All', '#1976d2');
+        const importBtn  = mkToolBtn('📥 Import',   '#6c757d');
+        const exportBtn  = mkToolBtn('📤 Export',   '#6c757d');
+        const resetBtn   = mkToolBtn('🔄 Reset',    '#dc3545');
+        addBtn.onclick = () => {
+            partcodeMap.push({ key: '', part: '', desc: '' });
+            editorRefreshList(listContainer, true);
+            setTimeout(() => {
+                const inputs = listContainer.querySelectorAll('input');
+                const last = inputs[inputs.length - 3];
+                if (last) { last.focus(); last.select(); last.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+            }, 50);
+        };
+        saveAllBtn.onclick = () => {
+            const rows = listContainer.querySelectorAll('div[data-index]');
+            const newMap = []; let err = false;
+            rows.forEach(r => {
+                const [k,p,d] = Array.from(r.querySelectorAll('input')).map(i => i.value.trim());
+                if (!k || !p) { err = true; return; }
+                newMap.push({ key: k, part: p, desc: d });
+            });
+            if (err) { showToast('⚠️ Alias & Partnumber dürfen nicht leer sein!'); return; }
+            partcodeMap = newMap; savePartcodeMap(partcodeMap); editorRefreshList(listContainer); showToast('✅ Alle gespeichert!');
+        };
+        importBtn.onclick = importJSON; exportBtn.onclick = exportJSON;
+        resetBtn.onclick = () => {
+            if (confirm('Alles zurücksetzen?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                partcodeMap = JSON.parse(JSON.stringify(defaultPartcodeMap));
+                editorRefreshList(listContainer);
             }
-        } catch (e) {}
-        input.style.backgroundColor = '#d4edda';
-        input.style.transition      = 'background-color 0.3s';
-        setTimeout(() => input.style.backgroundColor = '', 600);
-        removeDropdown();
-        setTimeout(() => autoFillQuantity(), 500);
-        console.log(`[Partcode] "${key}" → "${partNumber}" (Quantity: 1)`);
+        };
+        [addBtn, saveAllBtn, importBtn, exportBtn, resetBtn].forEach(b => toolbar.appendChild(b));
+
+        const listContainer = document.createElement('div');
+        listContainer.style.cssText = 'overflow-y:auto; flex:1;';
+        currentEditorList = listContainer;
+
+        const footer = document.createElement('div');
+        footer.style.cssText = 'padding:12px 20px; border-top:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border-radius:0 0 8px 8px;';
+        const hint = document.createElement('span');
+        hint.style.cssText = 'color:#666; font-size:12px; display:flex; align-items:center; gap:8px;';
+        hint.innerHTML = `VERGISS NICHT ZU SPEICHERN DU HOND
+            <a href="https://amazondeu-my.sharepoint.com/:x:/r/personal/kanataza_amazon_de/Documents/Spareparts%20by%20Azad%20Kanat%20%26%20Co.xlsx?d=w6898e9f8051f4f8fb18dda1fa38c271b&csf=1&web=1&e=bWpnWq"
+               target="_blank" style="color:#1976d2; text-decoration:none; font-size:12px; font-weight:600; padding:2px 7px; border:1px solid #1976d2; border-radius:3px; background:#e3f2fd; white-space:nowrap;">📋 Azad's Sparepartliste</a>`;
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Schließen';
+        closeBtn.style.cssText = 'padding:8px 20px; background:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;';
+        closeBtn.onclick = () => { isEditorOpen = false; currentEditorList = null; overlay.remove(); };
+        footer.appendChild(hint); footer.appendChild(closeBtn);
+
+        [header, toolbar, listContainer, footer].forEach(el => panel.appendChild(el));
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+        editorRefreshList(listContainer);
+    }
+
+    // ── Mini-Helpers ─────────────────────────────────────────────────────────
+    function mkToolBtn(text, color) {
+        const b = document.createElement('button');
+        b.textContent = text;
+        b.style.cssText = `padding:6px 12px; background:${color}; color:white; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500;`;
+        return b;
+    }
+    function mkIconBtn(icon, color, title) {
+        const b = document.createElement('button');
+        b.textContent = icon; b.title = title;
+        b.style.cssText = `width:32px; height:32px; border:none; background:${color}; color:white; border-radius:4px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;`;
+        return b;
+    }
+    function mkInput(value, width, placeholder, forceLower) {
+        const inp = document.createElement('input');
+        inp.value = value; inp.placeholder = placeholder;
+        inp.style.cssText = `width:${width}; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px; font-family:monospace; flex-shrink:0; ${forceLower ? 'text-transform:lowercase;' : ''}`;
+        if (forceLower) inp.addEventListener('input', () => { const p = inp.selectionStart; inp.value = inp.value.toLowerCase(); inp.setSelectionRange(p,p); });
+        inp.addEventListener('mousedown', e => e.stopPropagation(), true);
+        inp.addEventListener('click',     e => e.stopPropagation(), true);
+        return inp;
+    }
+    function exportJSON() {
+        const blob = new Blob([JSON.stringify(partcodeMap, null, 2)], { type: 'application/json' });
+        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'partcodes_export.json' });
+        a.click(); URL.revokeObjectURL(a.href); showToast('📤 Exportiert!');
+    }
+    function importJSON() {
+        const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
+        inp.onchange = e => {
+            const file = e.target.files[0]; if (!file) return;
+            const r = new FileReader();
+            r.onload = ev => {
+                try {
+                    let imported = JSON.parse(ev.target.result);
+                    if (!Array.isArray(imported)) imported = Object.entries(imported).map(([k,v]) => ({ key:k, part:v.part, desc:v.desc||'' }));
+                    if (confirm(`${imported.length} Einträge importieren?`)) {
+                        partcodeMap.push(...imported); savePartcodeMap(partcodeMap);
+                        if (currentEditorList) editorRefreshList(currentEditorList);
+                        showToast('📥 Import ok!');
+                    }
+                } catch(err) { alert('Fehler: ' + err.message); }
+            };
+            r.readAsText(file);
+        };
+        inp.click();
+    }
+    function showToast(msg) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = 'position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:12px 24px; border-radius:6px; font-size:14px; z-index:1000001;';
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
     }
 
     // ═══════════════════════════════════════════════════════
@@ -734,48 +543,30 @@ const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el =
     // ═══════════════════════════════════════════════════════
     document.addEventListener('input', (e) => {
         const input = e.target;
-        if (input.name !== 'partcode') return;
-        if (isEditorOpen) return;
-        const val = input.value;
-        if (val.length >= 1) {
-            populateDropdown(input, val);
-        } else {
-            removeDropdown();
-        }
+        if (input.name !== 'partcode' || isEditorOpen) return;
+        if (input.value.length >= 1) populateDropdown(input, input.value);
+        else removeDropdown();
     }, true);
 
     document.addEventListener('click', (e) => {
         if (isEditorOpen) return;
-        if (activeDropdown && !activeDropdown.contains(e.target) && e.target !== activeInput) {
-            removeDropdown();
-        }
+        if (activeDropdown && !activeDropdown.contains(e.target) && e.target !== activeInput) removeDropdown();
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' || e.key === 'Tab') {
-            removeDropdown();
-        }
+        if (e.key === 'Escape' || e.key === 'Tab') removeDropdown();
     }, true);
 
     // ═══════════════════════════════════════════════════════
-    // INITIALISIERUNG
+    // INIT
     // ═══════════════════════════════════════════════════════
-    function init() {
-        injectEditorButton();
-        setTimeout(injectEditorButton, 1000);
-        setTimeout(injectEditorButton, 3000);
-    }
+    const style = document.createElement('style');
+    style.textContent = '@keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }';
+    document.head.appendChild(style);
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
+    function init() { injectEditorButton(); setTimeout(injectEditorButton, 1000); setTimeout(injectEditorButton, 3000); }
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
+    new MutationObserver(() => injectEditorButton()).observe(document.body, { childList: true, subtree: true });
 
-    const observer = new MutationObserver(() => {
-        injectEditorButton();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    console.log('[Partcode Auto-Ersetzung v4.1] Geladen. Neue Einträge landen immer am Ende.');
+    console.log('[Partcode v5.0] Bereit — lokal + EAM Live-Suche aktiv.');
 })();
