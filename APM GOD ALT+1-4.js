@@ -254,6 +254,17 @@
         `;
         document.body.appendChild(panel);
 
+        // Restore saved panel position (remember last drag position)
+        const savedPos = localStorage.getItem('apmgod-panel-pos');
+        if (savedPos) {
+            try {
+                const pos = JSON.parse(savedPos);
+                panel.style.left  = pos.left;
+                panel.style.top   = pos.top;
+                panel.style.right = 'auto';
+            } catch (e) {}
+        }
+
         // Apply correct initial octype toggle state
         const btnNormal   = panel.querySelector('#ag-btn-normal');
         const btnOvertime = panel.querySelector('#ag-btn-overtime');
@@ -276,10 +287,32 @@
             panel.style.top   = (e.clientY - oy) + 'px';
             panel.style.right = 'auto';
         });
-        document.addEventListener('mouseup', () => { dragging = false; });
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                const r = panel.getBoundingClientRect();
+                localStorage.setItem('apmgod-panel-pos', JSON.stringify({
+                    left: r.left + 'px',
+                    top:  r.top  + 'px'
+                }));
+            }
+            dragging = false;
+        });
+
+        // Enter key anywhere while panel is open = submit (capture phase so EAM can't block it)
+        const agEnterHandler = e => {
+            if ((e.key === 'Enter' || e.which === 13) && document.getElementById('apmgod-panel')) {
+                e.preventDefault();
+                e.stopPropagation();
+                submitForm();
+            }
+        };
+        document.addEventListener('keydown', agEnterHandler, true);
 
         // Close
-        panel.querySelector('.ag-close').onclick = () => panel.remove();
+        panel.querySelector('.ag-close').onclick = () => {
+            document.removeEventListener('keydown', agEnterHandler, true);
+            panel.remove();
+        };
 
         // Preset buttons: click = select, dblclick = select + book
         panel.querySelectorAll('.ag-preset-btn').forEach(btn => {
