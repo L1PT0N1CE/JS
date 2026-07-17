@@ -157,6 +157,39 @@
         return agSelectedHours;
     }
 
+    function clickEamBookButton() {
+        // EAM uses uft-id-* class pattern for action buttons (same as uft-id-yes in Section 7)
+        const byUftId = document.querySelector('a.uft-id-book, a[class*="uft-id-book"]');
+        if (byUftId && byUftId.offsetParent !== null) {
+            byUftId.click();
+            return true;
+        }
+
+        // ExtJS: scan all visible buttons for "Book" / "Buchen" text
+        if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
+            const btns = Ext.ComponentQuery.query('button');
+            for (const btn of btns) {
+                const txt = (btn.text || btn.tooltip || '').toLowerCase();
+                if ((txt === 'book' || txt === 'buchen') && btn.isVisible && btn.isVisible() && !btn.isDisabled()) {
+                    btn.fireEvent ? btn.fireEvent('click', btn) : btn.el.dom.click();
+                    return true;
+                }
+            }
+        }
+
+        // DOM fallback: any visible button whose text is "Book" or "Buchen"
+        for (const el of document.querySelectorAll('.x-btn')) {
+            const t = (el.innerText || '').trim().toLowerCase();
+            if ((t === 'book' || t === 'buchen') && el.offsetParent !== null) {
+                el.click();
+                return true;
+            }
+        }
+
+        console.warn('[APM-GOD] EAM Book-Button nicht gefunden');
+        return false;
+    }
+
     function submitForm() {
         const panel = document.getElementById('apmgod-panel');
         if (!panel) return;
@@ -183,6 +216,9 @@
         }
 
         panel.remove();
+
+        // Give EAM 150ms to register field values, then click Book
+        setTimeout(clickEamBookButton, 150);
     }
 
     function showModalDialog() {
@@ -720,15 +756,11 @@
     // SECTION 5: Key Listeners ALT+4
     // ─────────────────────────────────────────────
 
-    $(document).keydown(function (event) {
-        if (event.altKey && event.which === 52) {
+    document.addEventListener('keydown', function (event) {
+        if (event.altKey && event.key === '4') {
             event.preventDefault();
-            if ($("#apmgod-panel").length === 0) showModalDialog();
+            if (!document.getElementById('apmgod-panel')) showModalDialog();
             fillTimeFunction();
-        }
-        if (event.which === 13 && $("#apmgod-panel").length > 0) {
-            event.preventDefault();
-            submitForm();
         }
     });
 
