@@ -1,572 +1,459 @@
 (function() {
     'use strict';
 
-    // ═══════════════════════════════════════════════════════
-    // PARTNUMMER-DATENBANK (lokal, sofort, kein Netz nötig)
-    // ═══════════════════════════════════════════════════════
     const STORAGE_KEY = 'partcodeMap_v3';
-
-    const defaultPartcodeMap = [
-        { key: "t11",                   part: "482512",  desc: "Podface" },
-        { key: "t10",                   part: "756583",  desc: "Podface" },
-        { key: "meaboard",              part: "2067189", desc: "Drives" },
-        { key: "backplane",             part: "2068498", desc: "Drives" },
-        { key: "fiducial",              part: "2111119", desc: "Floor Barcode" },
-        { key: "hookarm",               part: "93176",   desc: "Charger" },
-        { key: "ui",                    part: "N46141",  desc: "Drives" },
-        { key: "monitor",               part: "95656",   desc: "Stations" },
-        { key: "filter",                part: "41520",   desc: "Blackbox - Stations" },
-        { key: "filterplc",             part: "N42164",  desc: "PLC - Stations" },
-        { key: "ups",                   part: "93176",   desc: "Blackbox - Stations" },
-        { key: "beamer",                part: "42145",   desc: "Stations" },
-        { key: "rack",                  part: "97171",   desc: "Rackbutton - Stations" },
-        { key: "recharge",              part: "2067614", desc: "Socket - Charger" },
-        { key: "charger",               part: "2068043", desc: "Delta - Charger" },
-        { key: "chargesock",            part: "2068424", desc: "Socket - Drives" },
-        { key: "toppad",                part: "285706",  desc: "Drives" },
-        { key: "ods",                   part: "41532",   desc: "Drives" },
-        { key: "turntable",             part: "N23913",  desc: "Drives" },
-        { key: "turntable motor",       part: "2068504", desc: "Drives" },
-        { key: "radio topleft",         part: "82616",   desc: "Drives" },
-        { key: "radio topright",        part: "82615",   desc: "Drives" },
-        { key: "radio slowleft",        part: "82614",   desc: "Drives" },
-        { key: "radio slowright",       part: "82617",   desc: "Drives" },
-        { key: "tbs",                   part: "N37718",  desc: "TBS komplett" },
-        { key: "thermoleiste",          part: "2068257", desc: "Slam" },
-        { key: "borfeld",               part: "80760",   desc: "BORfeld komplett" },
-        { key: "loco wheel",            part: "3000011", desc: "ASI WHEEL - Drives" },
-        { key: "turntable liftermotor", part: "2067201", desc: "Drives" },
-        { key: "casterwheel",           part: "N18702",  desc: "Drives" },
-        { key: "poly 256",              part: "57562",   desc: "Belts" },
-        { key: "poly 286",              part: "102592",  desc: "Belts" },
-        { key: "powertwist",            part: "57470",   desc: "Belts" },
-        { key: "printer left",          part: "55622",   desc: "Slam" },
-        { key: "printer right",         part: "153213",  desc: "Slam" },
-        { key: "applicator right",      part: "80198",   desc: "Slam" },
-        { key: "applicator left",       part: "80199",   desc: "Slam" },
-        { key: "rewinder right",        part: "65714",   desc: "Slam" },
-        { key: "rewinder left",         part: "85394",   desc: "Slam" }
+    const DEFAULT_MAP = [
+        { key:"t11",                   part:"482512",  desc:"Podface" },
+        { key:"t10",                   part:"756583",  desc:"Podface" },
+        { key:"meaboard",              part:"2067189", desc:"Drives" },
+        { key:"backplane",             part:"2068498", desc:"Drives" },
+        { key:"fiducial",              part:"2111119", desc:"Floor Barcode" },
+        { key:"hookarm",               part:"93176",   desc:"Charger" },
+        { key:"ui",                    part:"N46141",  desc:"Drives" },
+        { key:"monitor",               part:"95656",   desc:"Stations" },
+        { key:"filter",                part:"41520",   desc:"Blackbox - Stations" },
+        { key:"filterplc",             part:"N42164",  desc:"PLC - Stations" },
+        { key:"ups",                   part:"93176",   desc:"Blackbox - Stations" },
+        { key:"beamer",                part:"42145",   desc:"Stations" },
+        { key:"rack",                  part:"97171",   desc:"Rackbutton - Stations" },
+        { key:"recharge",              part:"2067614", desc:"Socket - Charger" },
+        { key:"charger",               part:"2068043", desc:"Delta - Charger" },
+        { key:"chargesock",            part:"2068424", desc:"Socket - Drives" },
+        { key:"toppad",                part:"285706",  desc:"Drives" },
+        { key:"ods",                   part:"41532",   desc:"Drives" },
+        { key:"turntable",             part:"N23913",  desc:"Drives" },
+        { key:"turntable motor",       part:"2068504", desc:"Drives" },
+        { key:"radio topleft",         part:"82616",   desc:"Drives" },
+        { key:"radio topright",        part:"82615",   desc:"Drives" },
+        { key:"radio slowleft",        part:"82614",   desc:"Drives" },
+        { key:"radio slowright",       part:"82617",   desc:"Drives" },
+        { key:"tbs",                   part:"N37718",  desc:"TBS komplett" },
+        { key:"thermoleiste",          part:"2068257", desc:"Slam" },
+        { key:"borfeld",               part:"80760",   desc:"BORfeld komplett" },
+        { key:"loco wheel",            part:"3000011", desc:"ASI WHEEL - Drives" },
+        { key:"turntable liftermotor", part:"2067201", desc:"Drives" },
+        { key:"casterwheel",           part:"N18702",  desc:"Drives" },
+        { key:"poly 256",              part:"57562",   desc:"Belts" },
+        { key:"poly 286",              part:"102592",  desc:"Belts" },
+        { key:"powertwist",            part:"57470",   desc:"Belts" },
+        { key:"printer left",          part:"55622",   desc:"Slam" },
+        { key:"printer right",         part:"153213",  desc:"Slam" },
+        { key:"applicator right",      part:"80198",   desc:"Slam" },
+        { key:"applicator left",       part:"80199",   desc:"Slam" },
+        { key:"rewinder right",        part:"65714",   desc:"Slam" },
+        { key:"rewinder left",         part:"85394",   desc:"Slam" },
     ];
 
-    function loadPartcodeMap() {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) return JSON.parse(stored);
-        } catch (e) {}
-        return JSON.parse(JSON.stringify(defaultPartcodeMap));
-    }
-    function savePartcodeMap(map) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(map)); return true; } catch(e) { return false; }
-    }
-    let partcodeMap = loadPartcodeMap();
+    let partcodeMap = (() => {
+        try { const s=localStorage.getItem(STORAGE_KEY); if(s) return JSON.parse(s); } catch(e){}
+        return JSON.parse(JSON.stringify(DEFAULT_MAP));
+    })();
+    function saveMap(m) { try{localStorage.setItem(STORAGE_KEY,JSON.stringify(m));return true;}catch(e){return false;} }
 
-    // ═══════════════════════════════════════════════════════
-    // EAM SESSION (für Live-Suche)
-    // ═══════════════════════════════════════════════════════
-    function getEamSession() {
-        // 1) aus iframe src (zuverlässigste Quelle)
-        const iframe = document.querySelector('iframe[src*="eamid="]');
-        if (iframe) {
-            try {
-                const p = new URL(iframe.src).searchParams;
-                const eamid = p.get('eamid'), tenant = p.get('tenant');
-                if (eamid) return { eamid, tenant: tenant || 'AMAZONRMEEU_PRD' };
-            } catch(e) {}
-        }
-        // 2) aus EAM SessionStorage namespace
-        try {
-            const sess = window.EAM?.SessionStorage;
-            if (sess?.eamid) return { eamid: sess.eamid, tenant: sess.tenant || 'AMAZONRMEEU_PRD' };
-        } catch(e) {}
-        // 3) aus gAppData (Start Center)
-        try {
-            const ip = window.gAppData?.initparams || '';
-            const m = ip.match(/eamid=([^&]+)/);
-            if (m) return { eamid: m[1], tenant: 'AMAZONRMEEU_PRD' };
-        } catch(e) {}
+    // EAM SESSION — auch APMApi nutzen (hat die richtige eamid)
+    function getSession() {
+        try { const p=new URLSearchParams(window.location.search),e=p.get('eamid'),t=p.get('tenant'); if(e) return {eamid:e,tenant:t||'AMAZONRMEEU_PRD'}; } catch(_){}
+        try { const top=window!==window.top?window.top:window, f=top.document.querySelector('iframe[src*="eamid="]'); if(f){const p2=new URL(f.src).searchParams,e=p2.get('eamid');if(e)return{eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'};} } catch(_){}
+        try { for(const w of [window,window.top]){const ss=w?.EAM?.SessionStorage;if(ss?.eamid)return{eamid:ss.eamid,tenant:ss.tenant||'AMAZONRMEEU_PRD'};} } catch(_){}
+        // APMApi fallback — nutzt eigene eamid (hat Zugang zu allen dataspies)
+        try { const cat=window.APMApi?.get?.('partsCatalog');if(cat?.getImageUrl){const url=cat.getImageUrl('x')||'';const m=url.match(/eamid=([^&]+)/);if(m?.[1])return{eamid:m[1],tenant:'AMAZONRMEEU_PRD'};} } catch(_){}
         return null;
     }
+    const BASE='https://eu1.eam.hxgnsmartcloud.com/web/base/';
+    let _abort=null;
 
-    function getBaseUrl() {
-        return `https://${window.location.hostname}/web/base/`;
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // LIVE EAM SUCHE (SSPART.xmlhttp)
-    // ═══════════════════════════════════════════════════════
-    let _liveDebounceTimer = null;
-    let _liveAbort = null;
-
-    async function searchEAMLive(query) {
-        const sess = getEamSession();
-        if (!sess) return [];
-
-        if (_liveAbort) _liveAbort.abort();
-        _liveAbort = new AbortController();
-
-        const q = query.trim();
-        // MADDON_FILTER: partcode CONTAINS q  OR  partdescription CONTAINS q
-        const params = new URLSearchParams({
-            GRID_ID:                        '80',
-            GRID_NAME:                      'SSPART',
-            DATASPY_ID:                     '101466',
-            USER_FUNCTION_NAME:             'SSPART',
-            SYSTEM_FUNCTION_NAME:           'SSPART',
-            CURRENT_TAB_NAME:               'LST',
-            COMPONENT_INFO_TYPE:            'DATA_ONLY',
-            FORCE_REQUERY:                  'YES',
-            MAX_ROWS:                       '30',
-            NUMBER_OF_ROWS_FIRST_RETURNED:  '30',
-            eamid:                          sess.eamid,
-            tenant:                         sess.tenant,
-            // Filter 1: partcode CONTAINS q (OR)
-            MADDON_FILTER_ALIAS_NAME_1:     'partcode',
-            MADDON_FILTER_OPERATOR_1:       'CONTAINS',
-            MADDON_FILTER_VALUE_1:          q,
-            MADDON_FILTER_SEQNUM_1:         '1',
-            MADDON_FILTER_JOINER_1:         'OR',
-            MADDON_LPAREN_1:                'true',
-            MADDON_RPAREN_1:                'false',
-            // Filter 2: partdescription CONTAINS q (end of OR group)
-            MADDON_FILTER_ALIAS_NAME_2:     'partdescription',
-            MADDON_FILTER_OPERATOR_2:       'CONTAINS',
-            MADDON_FILTER_VALUE_2:          q,
-            MADDON_FILTER_SEQNUM_2:         '2',
-            MADDON_FILTER_JOINER_2:         'AND',
-            MADDON_LPAREN_2:                'false',
-            MADDON_RPAREN_2:                'true',
-        });
-
-        try {
-            const resp = await fetch(getBaseUrl() + 'SSPART.xmlhttp', {
-                method:      'POST',
-                headers:     { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
-                body:        params.toString(),
-                credentials: 'include',
-                signal:      _liveAbort.signal
-            });
-            const text = await resp.text();
-            const json = JSON.parse(text);
-            const meta = json?.pageData?.grid?.GRIDRESULT?.GRID?.METADATA?.COLUMN || [];
-            const data = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA || [];
-
-            // Spalten-Index einmalig aufbauen
-            const colIdx = {};
-            (Array.isArray(meta) ? meta : [meta]).forEach((col, i) => {
-                const name = col?.ALIAS_NAME || col?.COLUMN_NAME || '';
-                colIdx[name.toLowerCase()] = i;
-            });
-
-            return data.map(row => {
-                const arr = Array.isArray(row) ? row : Object.values(row);
-                const get = (name) => arr[colIdx[name.toLowerCase()]] ?? '';
-                return {
-                    part:  get('partcode'),
-                    desc:  get('partdescription'),
-                    stock: get('par_currbal') || get('instock') || '',
-                    // Foto-URL wenn vorhanden (braucht documentcode Feld)
-                    imgCode: get('documentcode') || get('imagecode') || '',
-                };
-            }).filter(r => r.part);
-        } catch(e) {
-            if (e.name !== 'AbortError') console.warn('[Partcode Live] Fehler:', e);
-            return [];
-        }
-    }
-
-    function getPartImgUrl(docCode) {
-        if (!docCode) return null;
-        const sess = getEamSession();
-        if (!sess) return null;
-        // EAM Dokument-Viewer — selbes Prinzip wie APM Master
-        return `${getBaseUrl()}VIEWUDOC?documentcode=${encodeURIComponent(docCode)}&keepcontenttype=true&eamid=${sess.eamid}&tenant=${sess.tenant}`;
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // DROPDOWN
-    // ═══════════════════════════════════════════════════════
-    let activeDropdown = null;
-    let activeInput    = null;
-    let isEditorOpen   = false;
-
-    function createDropdown(input) {
-        removeDropdown();
-        const rect     = input.getBoundingClientRect();
-        const dropdown = document.createElement('div');
-        dropdown.id    = 'partcode-autocomplete';
-        dropdown.style.cssText = `
-            position:fixed; top:${rect.bottom}px; left:${rect.left}px;
-            width:${Math.max(rect.width, 480)}px; max-height:360px;
-            overflow-y:auto; background:#fff; border:1px solid #ccc;
-            border-top:none; border-radius:0 0 4px 4px;
-            box-shadow:0 4px 12px rgba(0,0,0,.18);
-            z-index:999999; font-family:Arial,sans-serif; font-size:13px;
-        `;
-        activeDropdown = dropdown;
-        activeInput    = input;
-        document.body.appendChild(dropdown);
-        return dropdown;
-    }
-
-    function removeDropdown() {
-        if (activeDropdown) { activeDropdown.remove(); activeDropdown = null; activeInput = null; }
-        clearTimeout(_liveDebounceTimer);
-    }
-
-    function makeSectionLabel(text) {
-        const d = document.createElement('div');
-        d.style.cssText = 'padding:4px 12px; background:#f0f4ff; color:#1565c0; font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; user-select:none;';
-        d.textContent = text;
-        return d;
-    }
-
-    function makeItem(part, desc, stock, imgCode, isLive) {
-        const item = document.createElement('div');
-        item.className = 'partcode-item';
-        item.dataset.part = part;
-        item.style.cssText = 'padding:7px 12px; cursor:pointer; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:8px; user-select:none;';
-        item.addEventListener('mouseenter', () => item.style.backgroundColor = '#e3f2fd');
-        item.addEventListener('mouseleave', () => item.style.backgroundColor = '#fff');
-        item.addEventListener('mousedown', (e) => {
-            e.stopImmediatePropagation(); e.preventDefault();
-            if (activeInput) selectPartcode(activeInput, part);
-        }, true);
-
-        const left = document.createElement('span');
-        left.innerHTML = isLive
-            ? `<span style="color:#1976d2; font-weight:600;">${part}</span> <span style="color:#555; margin-left:6px;">${desc}</span>`
-            : `<strong style="color:#1976d2;">${part}</strong> <span style="color:#666; margin-left:6px;">${desc}</span>`;
-
-        const right = document.createElement('span');
-        right.style.cssText = 'display:flex; align-items:center; gap:8px; flex-shrink:0;';
-        if (stock !== '') {
-            const s = document.createElement('span');
-            s.style.cssText = `padding:1px 6px; border-radius:3px; font-size:11px; font-weight:600; background:${Number(stock) > 0 ? '#e8f5e9' : '#fce4ec'}; color:${Number(stock) > 0 ? '#2e7d32' : '#c62828'};`;
-            s.textContent = `Lager: ${stock}`;
-            right.appendChild(s);
-        }
-        if (imgCode) {
-            const img = document.createElement('img');
-            img.src = getPartImgUrl(imgCode);
-            img.style.cssText = 'width:32px; height:32px; object-fit:contain; border:1px solid #ddd; border-radius:3px;';
-            img.onerror = () => img.remove();
-            right.appendChild(img);
-        }
-
-        item.appendChild(left);
-        item.appendChild(right);
-        return item;
-    }
-
-    async function populateDropdown(input, query) {
-        const dropdown = createDropdown(input);
-        const q = query.toLowerCase().trim();
-
-        // 1) Lokale Treffer sofort anzeigen
-        const localMatches = partcodeMap.filter(e =>
-            e.key.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q) || e.part.toLowerCase().includes(q)
-        );
-
-        if (localMatches.length > 0) {
-            dropdown.appendChild(makeSectionLabel('Meine Datenbank'));
-            localMatches.forEach(e => dropdown.appendChild(makeItem(e.part, `${e.key} — ${e.desc}`, '', '', false)));
-        }
-
-        // Live-Suche-Platzhalter
-        const liveSection = document.createElement('div');
-        liveSection.innerHTML = '<div style="padding:8px 12px; color:#888; font-style:italic; font-size:12px;">⏳ EAM wird durchsucht…</div>';
-        dropdown.appendChild(liveSection);
-
-        // 2) Debounced live search
-        clearTimeout(_liveDebounceTimer);
-        _liveDebounceTimer = setTimeout(async () => {
-            if (!activeDropdown) return;
-            const liveResults = await searchEAMLive(q);
-
-            liveSection.innerHTML = '';
-            if (liveResults.length === 0) {
-                liveSection.innerHTML = '<div style="padding:6px 12px; color:#aaa; font-size:12px; font-style:italic;">Keine weiteren EAM-Treffer.</div>';
+    // GM fetch wrapper — nutzt GM_xmlhttpRequest wie APM Master (bypasses page fetch)
+    function gmFetch(url, params) {
+        return new Promise((resolve, reject) => {
+            if(typeof GM_xmlhttpRequest === 'undefined') {
+                // fallback auf normales fetch
+                fetch(url, {method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams(params).toString()})
+                    .then(r=>r.text()).then(resolve).catch(reject);
                 return;
             }
-
-            // Duplikate mit lokaler DB rausfiltern
-            const localParts = new Set(localMatches.map(e => e.part));
-            const newOnes    = liveResults.filter(r => !localParts.has(r.part));
-
-            if (newOnes.length > 0) {
-                liveSection.appendChild(makeSectionLabel('EAM Parts Catalog (live)'));
-                newOnes.forEach(r => liveSection.appendChild(makeItem(r.part, r.desc, r.stock, r.imgCode, true)));
-            } else {
-                liveSection.innerHTML = '<div style="padding:6px 12px; color:#aaa; font-size:12px; font-style:italic;">Alle EAM-Treffer schon in lokaler DB.</div>';
-            }
-        }, 350);
+            GM_xmlhttpRequest({
+                method:'POST', url,
+                headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
+                data: new URLSearchParams(params).toString(),
+                withCredentials: true,
+                onload: r => resolve(r.responseText),
+                onerror: e => reject(new Error('GM_xhr error')),
+                ontimeout: () => reject(new Error('GM_xhr timeout')),
+                timeout: 15000
+            });
+        });
     }
 
-    // ═══════════════════════════════════════════════════════
-    // PART AUSWÄHLEN
-    // ═══════════════════════════════════════════════════════
-    function selectPartcode(input, partNumber) {
-        input.value = partNumber;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+    // EAM Suche — direkt SSPART.xmlhttp aufrufen (kein GRID_ID nötig!)
+    // rows kommen als objects zurück: {partcode, description, class, uom, ...}
+    const MY_STORE = 'FRA7'; // store filter
+    async function searchEAM(partcode, description) {
+        const s=getSession();
+        if(!s){console.warn('[Partcode] Session nicht gefunden');return [];}
+        if(_abort)try{_abort.abort();}catch(_){}
+        _abort=new AbortController();
+        const pq=(partcode||'').trim(), dq=(description||'').trim();
+        if(!pq&&!dq) return [];
+        // GRID_ID weglassen — sonst "Unable to retrieve records"
+        const params={
+            GRID_NAME:'SSPART', USER_FUNCTION_NAME:'SSPART', SYSTEM_FUNCTION_NAME:'SSPART',
+            CURRENT_TAB_NAME:'LST', COMPONENT_INFO_TYPE:'DATA_ONLY',
+            FORCE_REQUERY:'YES', MAX_ROWS:'50',
+            eamid:s.eamid, tenant:s.tenant,
+        };
+        params.DATASPY_ID='101496'; params.GRID_ID='80'; // immer Parts in my Stores (FRA7)
+        let seq=1;
+        if(pq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='partcode';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=pq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
+        if(dq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=dq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
         try {
-            const cmpId = input.getAttribute('data-componentid');
-            if (cmpId && typeof Ext !== 'undefined') {
-                const cmp = Ext.getCmp(cmpId);
-                if (cmp?.setValue) cmp.setValue(partNumber);
+            const text=await gmFetch(BASE+'SSPART.xmlhttp', params);
+            const json=JSON.parse(text);
+            if(json?.pageData?.messages?.some(m=>m.type==='error')){
+                console.warn('[Partcode EAM] Error:',json.pageData.messages[0]?.msg);return [];
             }
-        } catch(e) {}
-        input.style.backgroundColor = '#d4edda';
-        input.style.transition = 'background-color 0.3s';
-        setTimeout(() => input.style.backgroundColor = '', 600);
-        removeDropdown();
-        setTimeout(() => setExtFieldValue('transactionquantity', '1'), 500);
+            const rows=json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA||[];
+            // rows sind objects — direkt lesen (kein index-mapping nötig)
+            const eamid=s.eamid;
+            // deduplizieren — API gibt manchmal mehrere Zeilen pro Teil (multi-bin)
+            const seen=new Set();
+            return rows.filter(row=>{const p=row.partcode||'';if(!p||seen.has(p))return false;seen.add(p);return true;}).map(row=>({
+                part:row.partcode||'',
+                desc:row.description||row.partdescription||'',
+                class:row.class||row.classCode||'',
+                uom:row.uom||'',
+                pic:row.profilepicture||'',
+                eamid,
+            })).filter(r=>r.part);
+        } catch(e){if(e.name!=='AbortError')console.warn('[Partcode EAM]',e.message);return [];}
     }
 
-    // ═══════════════════════════════════════════════════════
-    // EXT HILFSFUNKTIONEN
-    // ═══════════════════════════════════════════════════════
-    function getExtComponent(name) {
-        if (typeof Ext === 'undefined' || !Ext.ComponentQuery) return null;
-        const cmps = Ext.ComponentQuery.query(`[name="${name}"]`);
-        return cmps?.length ? cmps[0] : null;
+    // AUTOCOMPLETE DROP
+    let activeDrop=null,activeInp=null,editorOpen=false,_deb=null;
+    function removeDrop(){if(activeDrop){activeDrop.remove();activeDrop=null;activeInp=null;}clearTimeout(_deb);}
+
+    async function showDrop(input,query) {
+        if(activeDrop)activeDrop.remove();
+        const r=input.getBoundingClientRect();
+        const d=mk('div','pc-ac',`position:fixed;top:${r.bottom}px;left:${r.left}px;width:${Math.max(r.width,500)}px;max-height:360px;overflow-y:auto;background:#1a2030;border:1px solid #2a3a55;border-top:none;border-radius:0 0 6px 6px;box-shadow:0 8px 24px rgba(0,0,0,.6);z-index:999999;font-family:Arial,sans-serif;font-size:13px;color:#c8d4e8;`);
+        activeDrop=d;activeInp=input;
+        document.body.appendChild(d);
+        const q=query.toLowerCase().trim();
+        const local=partcodeMap.filter(e=>e.key.toLowerCase().includes(q)||e.desc.toLowerCase().includes(q)||e.part.toLowerCase().includes(q));
+        if(local.length){
+            const lbl=mk('div','',`padding:3px 12px;background:#111820;color:#4a7a4a;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;`);lbl.textContent='Gespeichert';d.appendChild(lbl);
+            local.forEach(e=>{
+                const it=mk('div','',`padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e2a3a;display:flex;justify-content:space-between;`);
+                it.innerHTML=`<span><span style="color:#6ba3e8;font-weight:700;font-family:monospace;">${e.part}</span><span style="color:#7a8aaa;margin-left:10px;font-size:12px;">${e.key} · ${e.desc}</span></span>`;
+                it.addEventListener('mouseenter',()=>it.style.background='#232d3f');
+                it.addEventListener('mouseleave',()=>it.style.background='');
+                it.addEventListener('mousedown',ev=>{ev.stopImmediatePropagation();ev.preventDefault();selectPart(input,e.part);},true);
+                d.appendChild(it);
+            });
+        }
+        const liveWrap=mk('div','',`padding:7px 14px;color:#3a5a8a;font-size:12px;font-style:italic;`);liveWrap.textContent='⏳ Suche in EAM…';d.appendChild(liveWrap);
+        clearTimeout(_deb);
+        _deb=setTimeout(async()=>{
+            if(!activeDrop)return;
+            const res=await searchEAM('', q); // autocomplete: als Beschreibungs-Suche
+            liveWrap.innerHTML='';
+            const used=new Set(local.map(e=>e.part));
+            const fresh=res.filter(r=>!used.has(r.part));
+            if(!fresh.length){liveWrap.style.cssText='padding:5px 14px;color:#334;font-size:12px;font-style:italic;';liveWrap.textContent=res.length?'Alle EAM-Treffer schon lokal.':'Keine weiteren EAM-Treffer.';return;}
+            const lbl2=mk('div','',`padding:3px 12px;background:#111820;color:#3a5a8a;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;`);lbl2.textContent=`EAM Catalog — ${fresh.length} Treffer`;liveWrap.appendChild(lbl2);
+            fresh.forEach(r=>{
+                const stk=parseInt(r.stock)||0;
+                const it=mk('div','',`padding:7px 14px;cursor:pointer;border-bottom:1px solid #1e2a3a;display:flex;justify-content:space-between;align-items:center;`);
+                it.innerHTML=`<span><span style="color:#6ba3e8;font-weight:700;font-family:monospace;">${r.part}</span><span style="color:#7a8aaa;margin-left:10px;font-size:12px;">${r.desc}</span></span><span style="display:flex;gap:6px;align-items:center;">${r.stock!==''?`<span style="padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;background:${stk>0?'#1a3a2a':'#3a1a1a'};color:${stk>0?'#4cce7a':'#e05555'};">${stk} Stk</span>`:''}<span style="padding:1px 5px;border-radius:3px;font-size:10px;background:#1a2a3a;color:#4a7ab5;font-weight:600;">EAM</span></span>`;
+                it.addEventListener('mouseenter',()=>it.style.background='#232d3f');
+                it.addEventListener('mouseleave',()=>it.style.background='');
+                it.addEventListener('mousedown',ev=>{ev.stopImmediatePropagation();ev.preventDefault();selectPart(input,r.part);},true);
+                liveWrap.appendChild(it);
+            });
+        },350);
     }
-    function setExtFieldValue(name, value) {
-        const cmp = getExtComponent(name);
-        if (cmp?.setValue) { cmp.setValue(value); cmp.fireEvent?.('change', cmp, value); return true; }
-        const input = document.querySelector(`input[name="${name}"]`);
-        if (input) { input.value = value; input.dispatchEvent(new Event('change', { bubbles: true })); }
-        return !!input;
+
+    function selectPart(input,part){
+        input.value=part;input.dispatchEvent(new Event('change',{bubbles:true}));
+        try{const id=input.getAttribute('data-componentid');if(id&&typeof Ext!=='undefined'){const c=Ext.getCmp(id);if(c?.setValue)c.setValue(part);}}catch(_){}
+        input.style.backgroundColor='#1a3a2a';setTimeout(()=>input.style.backgroundColor='',700);
+        removeDrop();setTimeout(()=>setExt('transactionquantity','1'),500);
+    }
+    function setExt(name,val){
+        if(typeof Ext!=='undefined'&&Ext.ComponentQuery){const c=Ext.ComponentQuery.query(`[name="${name}"]`)[0];if(c?.setValue){c.setValue(val);return;}}
+        const e=document.querySelector(`input[name="${name}"]`);if(e){e.value=val;e.dispatchEvent(new Event('change',{bubbles:true}));}
     }
 
-    // ═══════════════════════════════════════════════════════
-    // EDITOR BUTTON (unverändert aus v4)
-    // ═══════════════════════════════════════════════════════
-    function injectEditorButton() {
-        const acceptedTitles = ['Part Details & Planning', 'Teiledetails und Planung'];
-        const titleEl = Array.from(document.querySelectorAll('.x-title-text')).find(el => acceptedTitles.includes(el.textContent.trim()));
-        if (!titleEl || titleEl.querySelector('#partcode-editor-btn')) return;
-
-        const wrapper = document.createElement('span');
-        wrapper.style.cssText = 'display:inline-flex !important; align-items:center; white-space:nowrap;';
-        const orig = titleEl.textContent;
-        titleEl.textContent = '';
-        const textSpan = document.createElement('span');
-        textSpan.textContent = orig;
-        wrapper.appendChild(textSpan);
-
-        const btn = document.createElement('span');
-        btn.id = 'partcode-editor-btn';
-        btn.title = `Partcodes verwalten (${partcodeMap.length} Einträge)`;
-        btn.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; background:#1976d2; color:white; border-radius:3px; cursor:pointer; font-size:11px; margin-left:6px; user-select:none;';
-        btn.innerHTML = '⚙️';
-        btn.addEventListener('mouseenter', () => btn.style.background = '#1565c0');
-        btn.addEventListener('mouseleave', () => btn.style.background = '#1976d2');
-        btn.addEventListener('mousedown', (e) => {
-            e.preventDefault(); e.stopPropagation(); removeDropdown();
-            const pi = document.querySelector('input[name="partcode"]');
-            if (pi) { pi.value = ''; pi.dispatchEvent(new Event('change', { bubbles: true })); }
+    // EDITOR
+    function injectBtn(){
+        const TITLES=['Part Details & Planning','Teiledetails und Planung'];
+        const titleEl=Array.from(document.querySelectorAll('.x-title-text')).find(e=>TITLES.includes(e.textContent.trim()));
+        if(!titleEl||titleEl.querySelector('#pc-edit-btn'))return;
+        const wrap=mk('span','',`display:inline-flex!important;align-items:center;white-space:nowrap;`);
+        const orig=titleEl.textContent;titleEl.textContent='';
+        const tx=mk('span');tx.textContent=orig;
+        const btn=mk('span','pc-edit-btn',`display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;background:#1565c0;color:white;border-radius:3px;cursor:pointer;font-size:11px;margin-left:6px;user-select:none;transition:background .15s;`);
+        btn.textContent='⚙';btn.title=`Partnumber Editor (${partcodeMap.length})`;
+        btn.addEventListener('mouseenter',()=>btn.style.background='#0d47a1');
+        btn.addEventListener('mouseleave',()=>btn.style.background='#1565c0');
+        btn.addEventListener('mousedown',e=>{
+            e.preventDefault();e.stopPropagation();removeDrop();
+            const pi=document.querySelector('input[name="partcode"]');
+            if(pi){pi.value='';pi.dispatchEvent(new Event('change',{bubbles:true}));}
             openEditor();
         });
-        wrapper.appendChild(btn);
-        titleEl.appendChild(wrapper);
+        wrap.appendChild(tx);wrap.appendChild(btn);titleEl.appendChild(wrap);
     }
 
-    // ── Editor (identisch v4, kompakt) ──────────────────────────────────────
-    let currentEditorList = null;
+    function openEditor(startTab='db'){
+        if(editorOpen)return;editorOpen=true;
+        document.getElementById('pc-overlay')?.remove();
+        const overlay=mk('div','pc-overlay',`position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000000;display:flex;justify-content:center;align-items:center;font-family:Arial,sans-serif;`);
+        const panel=mk('div','',`background:#151b27;border:1px solid #2a3447;border-radius:8px;width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.7);`);
 
-    function editorRefreshList(container, scrollToBottom = false) {
-        container.innerHTML = '';
-        const sorted = [
-            ...partcodeMap.filter(e => e.key.trim()).sort((a,b) => a.key.localeCompare(b.key)),
-            ...partcodeMap.filter(e => !e.key.trim())
-        ];
-        if (!sorted.length) { container.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">Keine Einträge</div>'; return; }
-        sorted.forEach(entry => {
-            const realIdx = partcodeMap.indexOf(entry);
-            const row = document.createElement('div');
-            row.dataset.index = realIdx;
-            row.style.cssText = 'display:flex; align-items:center; padding:10px 20px; border-bottom:1px solid #f0f0f0; gap:8px;';
-            if (!entry.key.trim() && !entry.part.trim()) { row.style.background = '#fffde7'; }
-            const ki = mkInput(entry.key, '130px', 'Alias', true);
-            const pi = mkInput(entry.part, '110px', 'Partnumber', false);
-            const di = mkInput(entry.desc, '160px', 'Beschreibung', false);
-            const sv = mkIconBtn('💾','#28a745','Speichern');
-            const dl = mkIconBtn('🗑️','#dc3545','Löschen');
-            sv.onclick = () => {
-                const nk = ki.value.trim(), np = pi.value.trim(), nd = di.value.trim();
-                if (!nk || !np) { alert('Alias & Partnumber sind Pflicht!'); return; }
-                partcodeMap[parseInt(row.dataset.index)] = { key: nk, part: np, desc: nd };
-                savePartcodeMap(partcodeMap); editorRefreshList(container); showToast('✅ Gespeichert!');
+        // Header
+        const hdr=mk('div','',`padding:12px 18px;border-bottom:1px solid #2a3447;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;`);
+        const tit=mk('h2','',`margin:0;font-size:17px;color:#c8d8f8;`);tit.textContent='🔧 Partnumber Editor';
+        const cx=mk('button','',`background:transparent;border:none;color:#556;font-size:20px;cursor:pointer;padding:0 4px;line-height:1;`);cx.textContent='✕';
+        cx.addEventListener('mouseenter',()=>cx.style.color='#e05555');cx.addEventListener('mouseleave',()=>cx.style.color='#556');
+        cx.onclick=()=>{editorOpen=false;overlay.remove();};
+        hdr.appendChild(tit);hdr.appendChild(cx);
+
+        // Tabs
+        const tabBar=mk('div','',`display:flex;background:#0f1520;border-bottom:1px solid #2a3447;flex-shrink:0;`);
+        function mkTab(id,label){
+            const t=mk('div','',`padding:9px 22px;cursor:pointer;font-size:13px;font-weight:600;color:#6a7a9a;border-bottom:2px solid transparent;transition:all .15s;user-select:none;`);
+            t.dataset.tab=id;t.innerHTML=label;
+            t.addEventListener('mouseenter',()=>{if(activeTab!==id)t.style.color='#9ab0cc';});
+            t.addEventListener('mouseleave',()=>{if(activeTab!==id)t.style.color='#6a7a9a';});
+            return t;
+        }
+        const tabDB=mkTab('db','📋 Meine DB');
+        const tabEAM=mkTab('eam','🔍 EAM Suchen');
+        tabBar.appendChild(tabDB);tabBar.appendChild(tabEAM);
+
+        const body=mk('div','',`flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;`);
+
+        // Footer
+        const footer=mk('div','',`padding:10px 16px;border-top:1px solid #2a3447;display:flex;justify-content:space-between;align-items:center;background:#151b27;border-radius:0 0 8px 8px;flex-shrink:0;`);
+        const hint=mk('span','',`color:#445;font-size:12px;display:flex;align-items:center;gap:8px;`);
+        hint.innerHTML='VERGISS NICHT ZU SPEICHERN DU HOND <a href="https://amazondeu-my.sharepoint.com/:x:/r/personal/kanataza_amazon_de/Documents/Spareparts%20by%20Azad%20Kanat%20%26%20Co.xlsx?d=w6898e9f8051f4f8fb18dda1fa38c271b&csf=1&web=1&e=bWpnWq" target="_blank" style="color:#5a9ae8;text-decoration:none;padding:2px 8px;border:1px solid #2a4a7a;border-radius:3px;background:#0f1e35;font-weight:600;white-space:nowrap;">📋 Azad\'s Liste</a>';
+        footer.appendChild(hint);
+
+        panel.appendChild(hdr);panel.appendChild(tabBar);panel.appendChild(body);panel.appendChild(footer);
+        overlay.appendChild(panel);document.body.appendChild(overlay);
+
+        let activeTab='';
+        function switchTab(id){
+            activeTab=id;
+            [tabDB,tabEAM].forEach(t=>{const a=t.dataset.tab===id;t.style.color=a?'#c8d8f8':'#6a7a9a';t.style.borderBottom=a?'2px solid #4a8ae8':'2px solid transparent';});
+            body.innerHTML='';
+            if(id==='db')buildDBTab(body);
+            if(id==='eam')buildEAMTab(body);
+        }
+        tabDB.addEventListener('click',()=>switchTab('db'));
+        tabEAM.addEventListener('click',()=>switchTab('eam'));
+        switchTab(startTab);
+    }
+
+    // TAB: MEINE DB
+    function buildDBTab(container){
+        const tb=mk('div','',`padding:10px 14px;background:#1a2030;border-bottom:1px solid #2a3447;display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;`);
+        const addBtn=dBtn('➕ New','#1d6b38','#27964e');
+        const svAll=dBtn('💾 Save All','#1a3a6a','#1e4d8a');
+        const imp=dBtn('📥 Import','#2a3040','#3a4050');
+        const exp=dBtn('📤 Export','#2a3040','#3a4050');
+        const rst=dBtn('🔄 Reset','#5a1a1a','#7a2828');
+        [addBtn,svAll,imp,exp,rst].forEach(b=>tb.appendChild(b));
+        const list=mk('div','',`overflow-y:auto;flex:1;background:#1a2030;`);
+        renderDB(list);
+        container.appendChild(tb);container.appendChild(list);
+
+        addBtn.onclick=()=>{
+            partcodeMap.push({key:'',part:'',desc:''});renderDB(list,true);
+            setTimeout(()=>{const ins=list.querySelectorAll('input');const last=ins[ins.length-3];if(last){last.focus();last.select();last.scrollIntoView({behavior:'smooth',block:'nearest'});}},60);
+        };
+        svAll.onclick=()=>{
+            const rows=list.querySelectorAll('div[data-index]');const nm=[];let err=false;
+            rows.forEach(r=>{const [k,p,d]=Array.from(r.querySelectorAll('input')).map(i=>i.value.trim());if(!k||!p){err=true;return;}nm.push({key:k,part:p,desc:d});});
+            if(err){toast('⚠️ Alias & Partnumber dürfen nicht leer sein!');return;}
+            partcodeMap=nm;saveMap(partcodeMap);renderDB(list);toast('✅ Alle gespeichert!');
+        };
+        imp.onclick=doImport;exp.onclick=doExport;
+        rst.onclick=()=>{if(confirm('Alles zurücksetzen?')){localStorage.removeItem(STORAGE_KEY);partcodeMap=JSON.parse(JSON.stringify(DEFAULT_MAP));renderDB(list);}};
+    }
+
+    function renderDB(container,scrollBottom=false){
+        container.innerHTML='';
+        const sorted=[...partcodeMap.filter(e=>e.key.trim()).sort((a,b)=>a.key.localeCompare(b.key)),...partcodeMap.filter(e=>!e.key.trim())];
+        if(!sorted.length){const d=mk('div','',`padding:40px;text-align:center;color:#334;`);d.textContent='Keine Einträge';container.appendChild(d);return;}
+        sorted.forEach(entry=>{
+            const ri=partcodeMap.indexOf(entry);
+            const isEmpty=!entry.key.trim()&&!entry.part.trim();
+            const row=mk('div','',`display:flex;align-items:center;padding:7px 14px;border-bottom:1px solid #1e2a3a;gap:8px;background:${isEmpty?'#1a2518':'#1e2434'};transition:background .1s;`);
+            row.dataset.index=ri;
+            row.addEventListener('mouseenter',()=>{if(!isEmpty)row.style.background='#252e40';});
+            row.addEventListener('mouseleave',()=>{if(!isEmpty)row.style.background='#1e2434';});
+            const ki=dkInp(entry.key,'130px','Alias',true);
+            const pi=dkInp(entry.part,'110px','Partnumber',false);
+            const di=dkInp(entry.desc,'160px','Beschreibung',false);
+            const sv=iBtn('💾','#1d6b38','#27964e','Speichern');
+            const dl=iBtn('🗑️','#7b1f1f','#a52828','Löschen');
+            sv.onclick=()=>{
+                const nk=ki.value.trim(),np=pi.value.trim(),nd=di.value.trim();
+                if(!nk||!np){toast('⚠️ Pflichtfelder!');return;}
+                partcodeMap[parseInt(row.dataset.index)]={key:nk,part:np,desc:nd};saveMap(partcodeMap);renderDB(container);toast('✅ Gespeichert!');
             };
-            dl.onclick = () => {
-                if (confirm(`"${entry.key}" löschen?`)) {
-                    partcodeMap.splice(parseInt(row.dataset.index), 1);
-                    savePartcodeMap(partcodeMap); editorRefreshList(container); showToast('🗑️ Gelöscht!');
-                }
-            };
-            [ki,pi,di,sv,dl].forEach(el => row.appendChild(el));
-            container.appendChild(row);
+            dl.onclick=()=>{if(confirm(`"${entry.key}" löschen?`)){partcodeMap.splice(parseInt(row.dataset.index),1);saveMap(partcodeMap);renderDB(container);toast('🗑️ Gelöscht!');}};
+            [ki,pi,di,sv,dl].forEach(e=>row.appendChild(e));container.appendChild(row);
         });
-        if (scrollToBottom) requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+        if(scrollBottom)requestAnimationFrame(()=>{container.scrollTop=container.scrollHeight;});
     }
 
-    function openEditor() {
-        if (isEditorOpen) return; isEditorOpen = true;
-        document.getElementById('partcode-editor-overlay')?.remove();
-        const overlay = document.createElement('div');
-        overlay.id = 'partcode-editor-overlay';
-        overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000000; display:flex; justify-content:center; align-items:center; font-family:Arial,sans-serif;';
-        const panel = document.createElement('div');
-        panel.style.cssText = 'background:#fff; border-radius:8px; width:650px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.3);';
+    // TAB: EAM SUCHEN — getrennte Felder wie APM Master
+    function buildEAMTab(container){
+        const searchRow=mk('div','',`padding:12px 14px;background:#1a2030;border-bottom:1px solid #2a3447;display:flex;flex-direction:column;gap:8px;flex-shrink:0;`);
 
-        const header = document.createElement('div');
-        header.style.cssText = 'padding:16px 20px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center;';
-        header.innerHTML = `<h2 style="margin:0; font-size:18px; color:#333;">🔧 Partnumber Editor</h2><span style="color:#666; font-size:12px;">${partcodeMap.length} Einträge</span>`;
+        // Zeile 1: Labels
+        const labelRow=mk('div','',`display:flex;gap:8px;align-items:center;`);
+        const lPart=mk('span','',`color:#3a5a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;width:240px;flex-shrink:0;`);lPart.textContent='Partnummer';
+        const lDesc=mk('span','',`color:#3a5a8a;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;flex:1;`);lDesc.textContent='Beschreibung';
+        labelRow.appendChild(lPart);labelRow.appendChild(lDesc);
 
-        const toolbar = document.createElement('div');
-        toolbar.style.cssText = 'padding:12px 20px; background:#f8f9fa; border-bottom:1px solid #e0e0e0; display:flex; gap:8px; flex-wrap:wrap;';
-        const addBtn     = mkToolBtn('➕ New',      '#28a745');
-        const saveAllBtn = mkToolBtn('💾 Save All', '#1976d2');
-        const importBtn  = mkToolBtn('📥 Import',   '#6c757d');
-        const exportBtn  = mkToolBtn('📤 Export',   '#6c757d');
-        const resetBtn   = mkToolBtn('🔄 Reset',    '#dc3545');
-        addBtn.onclick = () => {
-            partcodeMap.push({ key: '', part: '', desc: '' });
-            editorRefreshList(listContainer, true);
-            setTimeout(() => {
-                const inputs = listContainer.querySelectorAll('input');
-                const last = inputs[inputs.length - 3];
-                if (last) { last.focus(); last.select(); last.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
-            }, 50);
-        };
-        saveAllBtn.onclick = () => {
-            const rows = listContainer.querySelectorAll('div[data-index]');
-            const newMap = []; let err = false;
-            rows.forEach(r => {
-                const [k,p,d] = Array.from(r.querySelectorAll('input')).map(i => i.value.trim());
-                if (!k || !p) { err = true; return; }
-                newMap.push({ key: k, part: p, desc: d });
+        // Zeile 2: Inputs + Button
+        const inputRow=mk('div','',`display:flex;gap:8px;align-items:center;`);
+        function mkSrch(ph,w){
+            const i=mk('input','',`height:32px;padding:0 10px;background:#0f1520;border:1px solid #2a3a55;border-radius:4px;color:#c8d4e8;font-size:13px;font-family:monospace;outline:none;${w?'width:'+w+';flex-shrink:0;':'flex:1;'}`);
+            i.placeholder=ph;
+            i.addEventListener('focus',()=>i.style.borderColor='#4a7ab5');
+            i.addEventListener('blur',()=>i.style.borderColor='#2a3a55');
+            return i;
+        }
+        const pInp=mkSrch('z.B. 285706','240px');
+        const dInp=mkSrch('z.B. top pad');
+        const goBtn=dBtn('🔍 Suchen','#1a3a6a','#1e4d8a');goBtn.style.cssText+='height:32px;flex-shrink:0;';
+        inputRow.appendChild(pInp);inputRow.appendChild(dInp);inputRow.appendChild(goBtn);
+
+        searchRow.appendChild(labelRow);
+        searchRow.appendChild(inputRow);
+
+        const status=mk('div','',`padding:6px 14px;color:#3a5a8a;font-size:12px;font-style:italic;background:#151b27;border-bottom:1px solid #2a3447;flex-shrink:0;min-height:28px;`);
+        status.textContent='Partnummer und/oder Beschreibung eingeben → Enter oder Suchen.';
+
+
+        const colHdr=mk('div','',`display:grid;grid-template-columns:130px 1fr 100px 60px 48px 80px;padding:5px 14px;background:#0f1520;border-bottom:1px solid #2a3447;font-size:11px;font-weight:700;color:#3a5a8a;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;gap:8px;`);
+        ['Partnummer','Beschreibung','Klasse','UOM','Bild',''].forEach(h=>{const c=mk('span');c.textContent=h;colHdr.appendChild(c);});
+
+        const results=mk('div','',`overflow-y:auto;flex:1;background:#1a2030;`);
+        container.appendChild(searchRow);container.appendChild(status);container.appendChild(colHdr);container.appendChild(results);
+
+        async function doSearch(){
+            const pq=pInp.value.trim(), dq=dInp.value.trim();
+            if(!pq&&!dq)return;
+            status.style.color='#3a5a8a';status.textContent='⏳ Suche läuft…';results.innerHTML='';
+            const data=await searchEAM(pq, dq);
+            if(!data.length){status.style.color='#e05555';status.textContent='Keine Treffer in EAM.';return;}
+            status.style.color='#4a7a4a';status.textContent=`${data.length} Treffer`;
+            data.forEach(r=>{
+                const saved=partcodeMap.some(e=>e.part===r.part);
+                const row=mk('div','',`display:grid;grid-template-columns:130px 1fr 100px 60px 48px 80px;padding:7px 14px;border-bottom:1px solid #1e2a3a;align-items:center;font-size:13px;gap:8px;transition:background .1s;${saved?'opacity:.5;':''}`);
+                row.addEventListener('mouseenter',()=>row.style.background='#232d3f');
+                row.addEventListener('mouseleave',()=>row.style.background='');
+                const p1=mk('span','',`color:#6ba3e8;font-weight:700;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`);p1.textContent=r.part;
+                const p2=mk('span','',`color:#8899bb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`);p2.textContent=r.desc;
+                const p3=mk('span','',`padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;background:#1a2540;color:#5a8adc;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`);p3.textContent=r.class||'—';
+                const p4=mk('span','',`color:#556;font-size:12px;`);p4.textContent=r.uom;
+                // Bild-Zelle
+                const imgCell=mk('div','',`width:48px;height:40px;display:flex;align-items:center;justify-content:center;`);
+                if(r.pic){
+                    const img=mk('img','',`width:40px;height:40px;object-fit:contain;border-radius:3px;border:1px solid #2a3a55;cursor:zoom-in;transition:transform .15s;`);
+                    img.src=`https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${r.eamid}`;
+                    img.onerror=()=>{imgCell.textContent='—';imgCell.style.cssText+='color:#334;font-size:12px;text-align:center;';};
+                    img.addEventListener('mouseenter',()=>img.style.transform='scale(3) translateX(-8px)');
+                    img.addEventListener('mouseleave',()=>img.style.transform='');
+                    imgCell.appendChild(img);
+                } else {
+                    imgCell.textContent='—';imgCell.style.cssText+='color:#334;font-size:12px;text-align:center;';
+                }
+                // action cell: + oder ✓+−
+                const actionCell=mk('div','',`display:flex;gap:4px;align-items:center;`);
+                if(saved){
+                    const ck=mk('button','',`width:30px;height:30px;background:#1a2030;border:1px solid #2a3040;border-radius:4px;color:#4a7a4a;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:default;`);
+                    ck.textContent='✓';ck.title='Bereits gespeichert';
+                    const rm=mk('button','',`width:30px;height:30px;background:#3a1a1a;border:1px solid #7a2828;border-radius:4px;color:#e05555;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;`);
+                    rm.textContent='−';rm.title='Aus DB entfernen';
+                    rm.addEventListener('mouseenter',()=>rm.style.background='#5a1a1a');
+                    rm.addEventListener('mouseleave',()=>rm.style.background='#3a1a1a');
+                    rm.onclick=()=>{
+                        const idx=partcodeMap.findIndex(e=>e.part===r.part);
+                        if(idx>=0){partcodeMap.splice(idx,1);saveMap(partcodeMap);}
+                        row.style.opacity='1';
+                        ck.style.color='#334';rm.remove();ck.textContent='';
+                        // reset zu + button
+                        const nb=mk('button','',`width:30px;height:30px;background:#1d6b38;border:1px solid #27964e;border-radius:4px;color:white;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;`);
+                        nb.textContent='＋';nb.title='Zu Meine DB hinzufügen';
+                        nb.addEventListener('mouseenter',()=>nb.style.background='#27964e');
+                        nb.addEventListener('mouseleave',()=>nb.style.background='#1d6b38');
+                        nb.onclick=()=>{
+                            const alias=prompt(`Alias für "${r.part}":\n(leer = Partnummer wird als Key verwendet)`,r.part.toLowerCase())??'';
+                            const key=(alias.trim()||r.part).toLowerCase();
+                            partcodeMap.push({key,part:r.part,desc:r.desc});saveMap(partcodeMap);
+                            toast(`✅ "${r.part}" gespeichert als "${key}"`);
+                        };
+                        actionCell.appendChild(nb);
+                        toast(`🗑️ "${r.part}" entfernt`);
+                    };
+                    actionCell.appendChild(ck);actionCell.appendChild(rm);
+                } else {
+                    const ab=mk('button','',`width:30px;height:30px;background:#1d6b38;border:1px solid #27964e;border-radius:4px;color:white;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;`);
+                    ab.textContent='＋';ab.title='Zu Meine DB hinzufügen';
+                    ab.addEventListener('mouseenter',()=>ab.style.background='#27964e');
+                    ab.addEventListener('mouseleave',()=>ab.style.background='#1d6b38');
+                    ab.onclick=()=>{
+                        const alias=prompt(`Alias für "${r.part}":\n(leer = Partnummer wird als Key verwendet)`,r.part.toLowerCase())??'';
+                        const key=(alias.trim()||r.part).toLowerCase();
+                        partcodeMap.push({key,part:r.part,desc:r.desc});saveMap(partcodeMap);
+                        ab.remove();
+                        const ck2=mk('button','',`width:30px;height:30px;background:#1a2030;border:1px solid #2a3040;border-radius:4px;color:#4a7a4a;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:default;`);
+                        ck2.textContent='✓';
+                        const rm2=mk('button','',`width:30px;height:30px;background:#3a1a1a;border:1px solid #7a2828;border-radius:4px;color:#e05555;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;`);
+                        rm2.textContent='−';rm2.addEventListener('mouseenter',()=>rm2.style.background='#5a1a1a');rm2.addEventListener('mouseleave',()=>rm2.style.background='#3a1a1a');
+                        rm2.onclick=()=>{const idx=partcodeMap.findIndex(e=>e.part===r.part);if(idx>=0){partcodeMap.splice(idx,1);saveMap(partcodeMap);}rm2.remove();ck2.remove();actionCell.appendChild(ab);row.style.opacity='1';toast(`🗑️ "${r.part}" entfernt`);};
+                        actionCell.appendChild(ck2);actionCell.appendChild(rm2);
+                        row.style.opacity='.5';toast(`✅ "${r.part}" gespeichert als "${key}"`);
+                    };
+                    actionCell.appendChild(ab);
+                }
+                [p1,p2,p3,p4,imgCell,actionCell].forEach(c=>row.appendChild(c));results.appendChild(row);
             });
-            if (err) { showToast('⚠️ Alias & Partnumber dürfen nicht leer sein!'); return; }
-            partcodeMap = newMap; savePartcodeMap(partcodeMap); editorRefreshList(listContainer); showToast('✅ Alle gespeichert!');
-        };
-        importBtn.onclick = importJSON; exportBtn.onclick = exportJSON;
-        resetBtn.onclick = () => {
-            if (confirm('Alles zurücksetzen?')) {
-                localStorage.removeItem(STORAGE_KEY);
-                partcodeMap = JSON.parse(JSON.stringify(defaultPartcodeMap));
-                editorRefreshList(listContainer);
-            }
-        };
-        [addBtn, saveAllBtn, importBtn, exportBtn, resetBtn].forEach(b => toolbar.appendChild(b));
-
-        const listContainer = document.createElement('div');
-        listContainer.style.cssText = 'overflow-y:auto; flex:1;';
-        currentEditorList = listContainer;
-
-        const footer = document.createElement('div');
-        footer.style.cssText = 'padding:12px 20px; border-top:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border-radius:0 0 8px 8px;';
-        const hint = document.createElement('span');
-        hint.style.cssText = 'color:#666; font-size:12px; display:flex; align-items:center; gap:8px;';
-        hint.innerHTML = `VERGISS NICHT ZU SPEICHERN DU HOND
-            <a href="https://amazondeu-my.sharepoint.com/:x:/r/personal/kanataza_amazon_de/Documents/Spareparts%20by%20Azad%20Kanat%20%26%20Co.xlsx?d=w6898e9f8051f4f8fb18dda1fa38c271b&csf=1&web=1&e=bWpnWq"
-               target="_blank" style="color:#1976d2; text-decoration:none; font-size:12px; font-weight:600; padding:2px 7px; border:1px solid #1976d2; border-radius:3px; background:#e3f2fd; white-space:nowrap;">📋 Azad's Sparepartliste</a>`;
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Schließen';
-        closeBtn.style.cssText = 'padding:8px 20px; background:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;';
-        closeBtn.onclick = () => { isEditorOpen = false; currentEditorList = null; overlay.remove(); };
-        footer.appendChild(hint); footer.appendChild(closeBtn);
-
-        [header, toolbar, listContainer, footer].forEach(el => panel.appendChild(el));
-        overlay.appendChild(panel);
-        document.body.appendChild(overlay);
-        editorRefreshList(listContainer);
+        }
+        let _liveDs=null;
+        function triggerLive(){clearTimeout(_liveDs);_liveDs=setTimeout(doSearch,250);}
+        goBtn.onclick=doSearch;
+        [pInp,dInp].forEach(i=>{
+            i.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+            i.addEventListener('input',triggerLive);
+        });
+        setTimeout(()=>dInp.focus(),80);
     }
 
-    // ── Mini-Helpers ─────────────────────────────────────────────────────────
-    function mkToolBtn(text, color) {
-        const b = document.createElement('button');
-        b.textContent = text;
-        b.style.cssText = `padding:6px 12px; background:${color}; color:white; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500;`;
-        return b;
-    }
-    function mkIconBtn(icon, color, title) {
-        const b = document.createElement('button');
-        b.textContent = icon; b.title = title;
-        b.style.cssText = `width:32px; height:32px; border:none; background:${color}; color:white; border-radius:4px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;`;
-        return b;
-    }
-    function mkInput(value, width, placeholder, forceLower) {
-        const inp = document.createElement('input');
-        inp.value = value; inp.placeholder = placeholder;
-        inp.style.cssText = `width:${width}; padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:13px; font-family:monospace; flex-shrink:0; ${forceLower ? 'text-transform:lowercase;' : ''}`;
-        if (forceLower) inp.addEventListener('input', () => { const p = inp.selectionStart; inp.value = inp.value.toLowerCase(); inp.setSelectionRange(p,p); });
-        inp.addEventListener('mousedown', e => e.stopPropagation(), true);
-        inp.addEventListener('click',     e => e.stopPropagation(), true);
-        return inp;
-    }
-    function exportJSON() {
-        const blob = new Blob([JSON.stringify(partcodeMap, null, 2)], { type: 'application/json' });
-        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'partcodes_export.json' });
-        a.click(); URL.revokeObjectURL(a.href); showToast('📤 Exportiert!');
-    }
-    function importJSON() {
-        const inp = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' });
-        inp.onchange = e => {
-            const file = e.target.files[0]; if (!file) return;
-            const r = new FileReader();
-            r.onload = ev => {
-                try {
-                    let imported = JSON.parse(ev.target.result);
-                    if (!Array.isArray(imported)) imported = Object.entries(imported).map(([k,v]) => ({ key:k, part:v.part, desc:v.desc||'' }));
-                    if (confirm(`${imported.length} Einträge importieren?`)) {
-                        partcodeMap.push(...imported); savePartcodeMap(partcodeMap);
-                        if (currentEditorList) editorRefreshList(currentEditorList);
-                        showToast('📥 Import ok!');
-                    }
-                } catch(err) { alert('Fehler: ' + err.message); }
-            };
-            r.readAsText(file);
-        };
-        inp.click();
-    }
-    function showToast(msg) {
-        const t = document.createElement('div');
-        t.textContent = msg;
-        t.style.cssText = 'position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:12px 24px; border-radius:6px; font-size:14px; z-index:1000001;';
-        document.body.appendChild(t);
-        setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
-    }
+    // HELPERS
+    function mk(tag,id='',style=''){const e=document.createElement(tag);if(id)e.id=id;if(style)e.style.cssText=style;return e;}
+    function dBtn(text,bg,bgh){const b=mk('button','',`padding:6px 14px;background:${bg};color:#d0daf0;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s;white-space:nowrap;`);b.innerHTML=text;b.addEventListener('mouseenter',()=>b.style.background=bgh);b.addEventListener('mouseleave',()=>b.style.background=bg);return b;}
+    function iBtn(icon,bg,bgh,title){const b=mk('button','',`width:34px;height:34px;background:${bg};border:none;border-radius:4px;cursor:pointer;font-size:15px;color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s;`);b.innerHTML=icon;b.title=title;b.addEventListener('mouseenter',()=>b.style.background=bgh);b.addEventListener('mouseleave',()=>b.style.background=bg);return b;}
+    function dkInp(value,width,placeholder,forceLower){const i=mk('input','',`width:${width};padding:5px 8px;background:#0f1520;border:1px solid #2a3a55;border-radius:4px;color:#c8d4e8;font-size:13px;font-family:monospace;flex-shrink:0;${forceLower?'text-transform:lowercase;':''}`);i.value=value;i.placeholder=placeholder;i.addEventListener('focus',()=>i.style.borderColor='#4a7ab5');i.addEventListener('blur',()=>i.style.borderColor='#2a3a55');if(forceLower)i.addEventListener('input',()=>{const p=i.selectionStart;i.value=i.value.toLowerCase();i.setSelectionRange(p,p);});i.addEventListener('mousedown',e=>e.stopPropagation(),true);i.addEventListener('click',e=>e.stopPropagation(),true);return i;}
+    function doExport(){const b=new Blob([JSON.stringify(partcodeMap,null,2)],{type:'application/json'});const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:'partcodes_export.json'});a.click();URL.revokeObjectURL(a.href);toast('📤 Exportiert!');}
+    function doImport(){const i=Object.assign(document.createElement('input'),{type:'file',accept:'.json'});i.onchange=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{let imp=JSON.parse(ev.target.result);if(!Array.isArray(imp))imp=Object.entries(imp).map(([k,v])=>({key:k,part:v.part,desc:v.desc||''}));if(confirm(`${imp.length} Einträge importieren?`)){partcodeMap.push(...imp);saveMap(partcodeMap);toast('📥 Import ok!');}}catch(err){alert('Fehler: '+err.message);}};r.readAsText(file);};i.click();}
+    function toast(msg){const t=mk('div','',`position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a2a3a;border:1px solid #2a4060;color:#c0d8f8;padding:10px 22px;border-radius:6px;font-size:14px;z-index:2000000;box-shadow:0 4px 12px rgba(0,0,0,.5);white-space:nowrap;`);t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},2200);}
 
-    // ═══════════════════════════════════════════════════════
-    // EVENT LISTENER
-    // ═══════════════════════════════════════════════════════
-    document.addEventListener('input', (e) => {
-        const input = e.target;
-        if (input.name !== 'partcode' || isEditorOpen) return;
-        if (input.value.length >= 1) populateDropdown(input, input.value);
-        else removeDropdown();
-    }, true);
-
-    document.addEventListener('click', (e) => {
-        if (isEditorOpen) return;
-        if (activeDropdown && !activeDropdown.contains(e.target) && e.target !== activeInput) removeDropdown();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' || e.key === 'Tab') removeDropdown();
-    }, true);
-
-    // ═══════════════════════════════════════════════════════
-    // INIT
-    // ═══════════════════════════════════════════════════════
-    const style = document.createElement('style');
-    style.textContent = '@keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }';
-    document.head.appendChild(style);
-
-    function init() { injectEditorButton(); setTimeout(injectEditorButton, 1000); setTimeout(injectEditorButton, 3000); }
-    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
-    new MutationObserver(() => injectEditorButton()).observe(document.body, { childList: true, subtree: true });
-
-    console.log('[Partcode v5.0] Bereit — lokal + EAM Live-Suche aktiv.');
+    // EVENTS & INIT
+    const sty=document.createElement('style');
+    sty.textContent='#pc-ac::-webkit-scrollbar,#pc-overlay *::-webkit-scrollbar{width:5px}#pc-ac::-webkit-scrollbar-track,#pc-overlay *::-webkit-scrollbar-track{background:#0f1520}#pc-ac::-webkit-scrollbar-thumb,#pc-overlay *::-webkit-scrollbar-thumb{background:#2a3a55;border-radius:3px}#pc-overlay input::placeholder{color:#334!important}';
+    document.head.appendChild(sty);
+    document.addEventListener('input',e=>{const i=e.target;if(i.name!=='partcode'||editorOpen)return;if(i.value.length>=1)showDrop(i,i.value);else removeDrop();},true);
+    document.addEventListener('click',e=>{if(editorOpen)return;if(activeDrop&&!activeDrop.contains(e.target)&&e.target!==activeInp)removeDrop();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Tab')removeDrop();},true);
+    function init(){injectBtn();setTimeout(injectBtn,1000);setTimeout(injectBtn,3000);}
+    document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
+    new MutationObserver(()=>injectBtn()).observe(document.body,{childList:true,subtree:true});
+    console.log('[Partcode v5.9] Ready. Session:',getSession()?.eamid?.slice(0,8)||'NOT FOUND');
 })();
