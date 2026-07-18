@@ -2,7 +2,7 @@
     'use strict';
 
     // ─────────────────────────────────────────────
-    // SECTION 1: APM Book Times ALT+4 — Schnellbuchung
+    // SECTION 1: APM Book Times ALT+4 Editable
     // ─────────────────────────────────────────────
 
     const $ = jQuery.noConflict(true);
@@ -27,117 +27,110 @@
         localStorage.setItem("customHours", JSON.stringify(hoursArray));
     }
 
-    function getFormattedToday() {
-        const d = new Date();
-        const day = String(d.getDate()).padStart(2, '0');
-        const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
-    }
-
-    // Panel state
-    let agSelectedHours  = null;
-    let agSelectedOctype = localStorage.getItem('lastSelectedOctype') || 'N';
-
-    const PANEL_CSS = `
-        #apmgod-panel{position:fixed;top:80px;right:20px;width:340px;background:#1a2332;border:1px solid #2a3447;border-radius:8px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#c8d4e8;box-shadow:0 8px 32px rgba(0,0,0,.5);user-select:none}
-        #apmgod-panel *{box-sizing:border-box}
-        .ag-header{background:#151b27;border-bottom:1px solid #2a3447;border-radius:8px 8px 0 0;padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:move}
-        .ag-header-title{font-size:14px;font-weight:700;color:#e2e8f0;flex:1;letter-spacing:.5px}
-        .ag-username-badge{background:#2a3447;border:1px solid #3b82f6;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:.5px}
-        .ag-close{background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:0 2px;line-height:1;transition:color .15s}
-        .ag-close:hover{color:#ef4444}
-        .ag-body{padding:12px 14px}
-        .ag-stats{background:#151b27;border:1px solid #2a3447;border-radius:6px;padding:6px 10px;font-size:12px;color:#94a3b8;margin-bottom:10px;text-align:center}
-        .ag-stats span{color:#60a5fa;font-weight:600}
-        .ag-date-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-        .ag-date-label{color:#64748b;font-size:12px;white-space:nowrap}
-        .ag-date-input{background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;padding:5px 8px;font-size:12px;flex:1;font-family:monospace}
-        .ag-date-input:focus{outline:none;border-color:#3b82f6}
-        .ag-hint{color:#475569;font-size:11px;margin-bottom:8px;font-style:italic}
-        .ag-presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
-        .ag-preset-btn{background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#94a3b8;padding:5px 8px;cursor:pointer;font-size:12px;min-width:38px;text-align:center;transition:all .15s}
-        .ag-preset-btn:hover{border-color:#3b82f6;color:#93c5fd}
-        .ag-preset-btn.selected{background:#1d4ed8;border-color:#3b82f6;color:#fff}
-        .ag-preset-btn.negative{border-color:#7f1d1d;color:#fca5a5}
-        .ag-preset-btn.negative:hover{border-color:#ef4444}
-        .ag-preset-btn.negative.selected{background:#7f1d1d;border-color:#ef4444;color:#fff}
-        .ag-edit-btn{background:none;border:1px dashed #2a3447;border-radius:5px;color:#475569;padding:5px 8px;cursor:pointer;font-size:13px;transition:all .15s}
-        .ag-edit-btn:hover{color:#94a3b8;border-color:#475569}
-        .ag-custom-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-        .ag-custom-input{flex:1;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;padding:6px 10px;font-size:12px}
-        .ag-custom-input:focus{outline:none;border-color:#3b82f6}
-        .ag-abzug-label{display:flex;align-items:center;gap:4px;color:#94a3b8;font-size:12px;cursor:pointer;white-space:nowrap}
-        .ag-abzug-label input{cursor:pointer}
-        .ag-toggle-row{display:flex;gap:6px;margin-bottom:12px}
-        .ag-toggle-btn{flex:1;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#64748b;padding:7px;cursor:pointer;font-size:12px;font-weight:600;text-align:center;transition:all .15s}
-        .ag-toggle-btn.active-normal{background:#1d4ed8;border-color:#3b82f6;color:#fff}
-        .ag-toggle-btn.active-overtime{background:#9a3412;border-color:#f97316;color:#fff}
-        .ag-employee-row{margin-bottom:12px}
-        .ag-employee-select{width:100%;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;padding:6px 10px;font-size:12px}
-        .ag-employee-select:focus{outline:none;border-color:#3b82f6}
-        .ag-submit-btn{width:100%;background:#16a34a;border:none;border-radius:6px;color:#fff;padding:10px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:background .15s}
-        .ag-submit-btn:hover{background:#15803d}
-        .ag-submit-btn:active{background:#166534}
-    `;
-
-    function injectPanelStyles() {
-        if (document.getElementById('apmgod-styles')) return;
-        const s = document.createElement('style');
-        s.id = 'apmgod-styles';
-        s.textContent = PANEL_CSS;
-        document.head.appendChild(s);
-    }
-
-    function getEamStats() {
-        try {
-            if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
-                const comps = Ext.ComponentQuery.query('[name="hrswork"]');
-                if (comps && comps.length > 0) {
-                    const val = comps[comps.length - 1].getValue();
-                    return { booked: val ? String(val).replace('.', ',') : '0,0' };
-                }
-            }
-        } catch (e) {}
-        return { booked: '0,0' };
-    }
-
     function showEditModal() {
-        if (document.getElementById('apmgod-edit')) return;
         const currentNames = getSavedNames() || [];
         const currentHours = getSavedHours();
 
-        const el = document.createElement('div');
-        el.id = 'apmgod-edit';
-        el.style.cssText = 'position:fixed;top:20%;left:50%;transform:translateX(-50%);width:420px;background:#1a2332;border:1px solid #2a3447;border-radius:8px;padding:20px;z-index:100001;color:#c8d4e8;font-family:-apple-system,sans-serif;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.6)';
-        el.innerHTML = `
-            <h3 style="margin:0 0 14px;color:#e2e8f0;font-size:15px">Namen &amp; Stunden bearbeiten</h3>
-            <label style="color:#94a3b8;font-size:12px">Namen / Logins (getrennt durch '/'):</label>
-            <textarea id="apmgod-edit-names" style="width:100%;height:60px;margin:6px 0 12px;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;padding:8px;font-size:12px;resize:none">${currentNames.join(' / ')}</textarea>
-            <label style="color:#94a3b8;font-size:12px">Stunden (getrennt durch '/', Komma oder Punkt):</label>
-            <textarea id="apmgod-edit-hours" style="width:100%;height:40px;margin:6px 0 14px;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;padding:8px;font-size:12px;resize:none">${currentHours.join(' / ')}</textarea>
-            <div style="display:flex;gap:8px">
-                <button id="apmgod-edit-save" style="flex:1;background:#16a34a;border:none;border-radius:5px;color:#fff;padding:8px;cursor:pointer;font-weight:600">Speichern</button>
-                <button id="apmgod-edit-cancel" style="flex:1;background:#2a3447;border:none;border-radius:5px;color:#c8d4e8;padding:8px;cursor:pointer">Abbrechen</button>
+        const editModal = `
+            <div id="edit-modal" style="position:fixed; top:20%; left:20%; width:60%; background:white; border:1px solid black; padding:20px; z-index:10000;">
+                <h3>Edit Names and Hours</h3>
+                <label>Names/Logins (separated by slash '/'):</label><br>
+                <textarea id="edit-names" style="width:100%; height:60px;">${currentNames.join(" / ")}</textarea><br><br>
+                <label>Hours of Work (separated by slash '/', decimals with comma or dot):</label><br>
+                <textarea id="edit-hours" style="width:100%; height:40px;">${currentHours.join(" / ")}</textarea><br><br>
+                <button id="save-edit">Save</button>
+                <button id="cancel-edit">Cancel</button>
             </div>
         `;
-        document.body.appendChild(el);
 
-        document.getElementById('apmgod-edit-save').onclick = () => {
-            const names = document.getElementById('apmgod-edit-names').value.split('/').map(s => s.trim()).filter(Boolean);
-            const hours = document.getElementById('apmgod-edit-hours').value.split('/').map(s => s.trim()).filter(Boolean);
+        $("body").append(editModal);
+
+        $("#save-edit").click(() => {
+            const names = $("#edit-names").val().split("/").map(s => s.trim()).filter(Boolean);
+            const hours = $("#edit-hours").val().split("/").map(s => s.trim()).filter(Boolean);
             saveNames(names);
             saveHours(hours);
-            el.remove();
-            const panel = document.getElementById('apmgod-panel');
-            if (panel) { panel.remove(); showModalDialog(); }
-        };
-        document.getElementById('apmgod-edit-cancel').onclick = () => el.remove();
+            $("#edit-modal").remove();
+            alert("Saved! Press ALT+4 to reload.");
+        });
+
+        $("#cancel-edit").click(() => {
+            $("#edit-modal").remove();
+        });
+    }
+
+    function showModalDialog() {
+        const names = getSavedNames();
+        if (!names || names.length === 0) {
+            alert("Please configure names.");
+            showEditModal();
+            return;
+        }
+
+        const storedEmployee = localStorage.getItem('lastSelectedEmployee') || names[0];
+        const storedHrswork  = localStorage.getItem('lastSelectedHrswork')  || '1,0';
+        const storedDatework = localStorage.getItem('lastSelectedDatework') || '';
+        const storedOctype   = localStorage.getItem('lastSelectedOctype')   || 'N';
+
+        const hoursList   = getSavedHours();
+        const nameOptions = names.map(n => `<option value="${n}">${n}</option>`).join('');
+        const hourOptions = hoursList.map(h => `<option value="${h}">${h}</option>`).join('');
+
+        const modalContent = `
+            <div id="modal-dialog" style="position: fixed; top: 50%; left: 20%; background-color: white; padding: 20px; border: 1px solid black; z-index: 9999;">
+                <h2>Select Options</h2>
+                <label for="employee-select">Employee:</label>
+                <select id="employee-select">${nameOptions}</select><br><br>
+                <label for="hrswork-select">Hours of Work:</label>
+                <select id="hrswork-select">${hourOptions}</select><br><br>
+                <label for="datework">Date of Work:</label>
+                <input type="text" id="datework" name="datework" class="uxdate" style="width: 150px;"><br><br>
+                <label for="octype-select">Hour Type:</label>
+                <select id="octype-select">
+                    <option value="N">Normal</option>
+                    <option value="O">Overtime</option>
+                </select><br><br>
+                <button id="submit-button">Submit</button>
+                <button id="edit-button">Edit Names & Hours</button>
+                <button id="close-button">Close</button>
+            </div>
+        `;
+
+        $("body").append(modalContent);
+        $("#modal-dialog").draggable();
+
+        $('#employee-select').val(names.includes(storedEmployee) ? storedEmployee : names[0]);
+        $('#hrswork-select').val(hoursList.includes(storedHrswork) ? storedHrswork : hoursList[0]);
+        $('#datework').val(storedDatework);
+        $('#octype-select').val(storedOctype);
+
+        if (storedDatework === '') {
+            fillDatework();
+        }
+
+        $("#submit-button").click(() => submitForm());
+        $("#close-button").click(() => $("#modal-dialog").remove());
+        $("#edit-button").click(() => {
+            $("#modal-dialog").remove();
+            showEditModal();
+        });
     }
 
     function fillDatework() {
-        const formattedDate = getFormattedToday();
-        const dateInput = document.getElementById('apmgod-date-input');
-        if (dateInput && !dateInput.value) dateInput.value = formattedDate;
+        const currentDate = new Date();
+        const day = currentDate.getDate();
+        const monthNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+        const month = monthNames[currentDate.getMonth()];
+        const year  = currentDate.getFullYear();
+        const formattedDate = (day < 10 ? '0' : '') + day + "-" + month + "-" + year;
+
+        let dateworkField = $("#modal-dialog input[name='datework']");
+        if (dateworkField.length === 0) dateworkField = $("input[name='datework']");
+
+        if (dateworkField.length > 0) {
+            dateworkField.val(formattedDate);
+            dateworkField.trigger('change');
+        }
     }
 
     function fillFields(selectedEmployee, selectedHrswork, selectedOctype) {
@@ -146,246 +139,20 @@
         $("input[name='octype']").val(selectedOctype);
     }
 
-    function getSelectedHours() {
-        const ci    = document.getElementById('apmgod-custom-input');
-        const abzug = document.getElementById('apmgod-abzug');
-        if (ci && ci.value.trim()) {
-            let val = ci.value.trim();
-            if (abzug && abzug.checked && !val.startsWith('-')) val = '-' + val;
-            return val;
-        }
-        return agSelectedHours;
-    }
-
-    function clickEamBookButton() {
-        // EAM toolbar save/book is the green save icon — uft-id-save is the standard EAM save action
-        // Try all known uft-id patterns for this button
-        const uftCandidates = ['save', 'book', 'booklabor', 'add', 'accept'];
-        for (const id of uftCandidates) {
-            const el = document.querySelector(`a.uft-id-${id}`);
-            if (el && el.offsetParent !== null && !el.closest('.x-item-disabled')) {
-                el.click();
-                console.log('[APM-GOD] Book via uft-id-' + id);
-                return true;
-            }
-        }
-
-        // ExtJS: find the first enabled toolbar button (save icon has no text, just icon class)
-        if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
-            // Look for toolbar button with save-related iconCls or action
-            const toolbars = Ext.ComponentQuery.query('toolbar');
-            for (const tb of toolbars) {
-                if (!tb.isVisible || !tb.isVisible()) continue;
-                const btns = tb.query('button');
-                for (const btn of btns) {
-                    const icon  = (btn.iconCls  || '').toLowerCase();
-                    const iid   = (btn.itemId   || '').toLowerCase();
-                    const tt    = (btn.tooltip  || '').toLowerCase();
-                    const txt   = (btn.text     || '').toLowerCase();
-                    if ((icon + iid + tt + txt).match(/save|book|accept|add/) && !btn.isDisabled()) {
-                        btn.el ? btn.el.dom.click() : btn.fireEvent('click', btn);
-                        console.log('[APM-GOD] Book via ExtJS btn', btn.itemId || btn.iconCls);
-                        return true;
-                    }
-                }
-            }
-        }
-
-        console.warn('[APM-GOD] EAM Book-Button nicht gefunden — alle a[class*=uft-id]:');
-        document.querySelectorAll('a[class*="uft-id"]').forEach(a => console.log(a.className));
-        return false;
-    }
-
     function submitForm() {
-        const panel = document.getElementById('apmgod-panel');
-        if (!panel) return;
+        const selectedEmployee = $("#employee-select").val();
+        const selectedHrswork  = $("#hrswork-select").val();
+        const selectedOctype   = $("#octype-select").val();
+        const selectedDate     = $("#datework").val();
 
-        const employeeEl = document.getElementById('apmgod-employee');
-        const dateInput  = document.getElementById('apmgod-date-input');
-        const names      = getSavedNames() || [''];
-
-        const selectedEmployee = employeeEl ? employeeEl.value : names[0];
-        const selectedHrswork  = getSelectedHours() || '1';
-        const selectedDate     = dateInput ? dateInput.value : getFormattedToday();
-
-        fillFields(selectedEmployee, selectedHrswork, agSelectedOctype);
+        fillFields(selectedEmployee, selectedHrswork, selectedOctype);
 
         localStorage.setItem('lastSelectedEmployee', selectedEmployee);
         localStorage.setItem('lastSelectedHrswork',  selectedHrswork);
-        localStorage.setItem('lastSelectedOctype',   agSelectedOctype);
+        localStorage.setItem('lastSelectedOctype',   selectedOctype);
         localStorage.setItem('lastSelectedDatework', selectedDate);
 
-        const eamDate = document.querySelector("input[name='datework']");
-        if (eamDate) {
-            eamDate.value = selectedDate;
-            eamDate.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        panel.remove();
-
-        // Give EAM 150ms to register field values, then click Book
-        setTimeout(clickEamBookButton, 150);
-    }
-
-    function showModalDialog() {
-        if (document.getElementById('apmgod-panel')) return;
-
-        const names = getSavedNames();
-        if (!names || names.length === 0) {
-            showEditModal();
-            return;
-        }
-
-        injectPanelStyles();
-
-        const storedEmployee = localStorage.getItem('lastSelectedEmployee') || names[0];
-        const storedDate     = localStorage.getItem('lastSelectedDatework') || getFormattedToday();
-        agSelectedOctype     = localStorage.getItem('lastSelectedOctype')   || 'N';
-        agSelectedHours      = localStorage.getItem('lastSelectedHrswork')  || '1';
-
-        const hoursList = getSavedHours();
-        const username  = (localStorage.getItem('apmUsername') || 'USER').toUpperCase();
-        const stats     = getEamStats();
-
-        const nameOptions = names.map(n =>
-            `<option value="${n}"${n === storedEmployee ? ' selected' : ''}>${n.toUpperCase()}</option>`
-        ).join('');
-
-        const presetBtns = hoursList.map(h => {
-            const isNeg = h.startsWith('-');
-            const isSel = h === agSelectedHours;
-            let cls = 'ag-preset-btn' + (isNeg ? ' negative' : '') + (isSel ? ' selected' : '');
-            return `<button class="${cls}" data-hours="${h}">${h}</button>`;
-        }).join('');
-
-        const panel = document.createElement('div');
-        panel.id = 'apmgod-panel';
-        panel.innerHTML = `
-            <div class="ag-header">
-                <span class="ag-header-title">Schnellbuchung</span>
-                <span class="ag-username-badge">${username}</span>
-                <button class="ag-close" title="Schließen">×</button>
-            </div>
-            <div class="ag-body">
-                <div class="ag-stats">
-                    Gebucht: <span class="ag-stats-booked">${stats.booked}h</span>
-                </div>
-                <div class="ag-date-row">
-                    <span class="ag-date-label">Datum</span>
-                    <input class="ag-date-input" id="apmgod-date-input" type="text" value="${storedDate}" placeholder="17-JUL-2026">
-                </div>
-                <div class="ag-hint">Doppelklick auf Preset → sofort buchen</div>
-                <div class="ag-presets">
-                    ${presetBtns}
-                    <button class="ag-edit-btn" id="apmgod-edit-presets" title="Bearbeiten">✏️</button>
-                </div>
-                <div class="ag-custom-row">
-                    <input class="ag-custom-input" id="apmgod-custom-input" type="text" placeholder="Stunden…">
-                    <label class="ag-abzug-label"><input type="checkbox" id="apmgod-abzug"> Abzug (-)</label>
-                </div>
-                <div class="ag-toggle-row">
-                    <button class="ag-toggle-btn" data-octype="N" id="ag-btn-normal">Normal</button>
-                    <button class="ag-toggle-btn" data-octype="O" id="ag-btn-overtime">Überstunden</button>
-                </div>
-                ${names.length > 1
-                    ? '<div class="ag-employee-row"><select class="ag-employee-select" id="apmgod-employee">' + nameOptions + '</select></div>'
-                    : '<input type="hidden" id="apmgod-employee" value="' + names[0] + '">'
-                }
-                <button class="ag-submit-btn" id="apmgod-submit">Arbeit buchen</button>
-            </div>
-        `;
-        document.body.appendChild(panel);
-
-        // Restore saved panel position (remember last drag position)
-        const savedPos = localStorage.getItem('apmgod-panel-pos');
-        if (savedPos) {
-            try {
-                const pos = JSON.parse(savedPos);
-                panel.style.left  = pos.left;
-                panel.style.top   = pos.top;
-                panel.style.right = 'auto';
-            } catch (e) {}
-        }
-
-        // Apply correct initial octype toggle state
-        const btnNormal   = panel.querySelector('#ag-btn-normal');
-        const btnOvertime = panel.querySelector('#ag-btn-overtime');
-        btnNormal.className   = 'ag-toggle-btn' + (agSelectedOctype === 'N' ? ' active-normal'   : '');
-        btnOvertime.className = 'ag-toggle-btn' + (agSelectedOctype === 'O' ? ' active-overtime' : '');
-
-        // Draggable
-        const header = panel.querySelector('.ag-header');
-        let dragging = false, ox = 0, oy = 0;
-        header.addEventListener('mousedown', e => {
-            if (e.target.classList.contains('ag-close')) return;
-            dragging = true;
-            const r = panel.getBoundingClientRect();
-            ox = e.clientX - r.left;
-            oy = e.clientY - r.top;
-        });
-        document.addEventListener('mousemove', e => {
-            if (!dragging) return;
-            panel.style.left  = (e.clientX - ox) + 'px';
-            panel.style.top   = (e.clientY - oy) + 'px';
-            panel.style.right = 'auto';
-        });
-        document.addEventListener('mouseup', () => {
-            if (dragging) {
-                const r = panel.getBoundingClientRect();
-                localStorage.setItem('apmgod-panel-pos', JSON.stringify({
-                    left: r.left + 'px',
-                    top:  r.top  + 'px'
-                }));
-            }
-            dragging = false;
-        });
-
-        // Enter key anywhere while panel is open = submit (capture phase so EAM can't block it)
-        const agEnterHandler = e => {
-            if ((e.key === 'Enter' || e.which === 13) && document.getElementById('apmgod-panel')) {
-                e.preventDefault();
-                e.stopPropagation();
-                submitForm();
-            }
-        };
-        document.addEventListener('keydown', agEnterHandler, true);
-
-        // Close
-        panel.querySelector('.ag-close').onclick = () => {
-            document.removeEventListener('keydown', agEnterHandler, true);
-            panel.remove();
-        };
-
-        // Preset buttons: click = select, dblclick = select + book
-        panel.querySelectorAll('.ag-preset-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                agSelectedHours = btn.dataset.hours;
-                const ci = document.getElementById('apmgod-custom-input');
-                if (ci) ci.value = '';
-                panel.querySelectorAll('.ag-preset-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-            });
-            btn.addEventListener('dblclick', () => {
-                agSelectedHours = btn.dataset.hours;
-                submitForm();
-            });
-        });
-
-        // Edit presets
-        panel.querySelector('#apmgod-edit-presets').onclick = () => showEditModal();
-
-        // Octype toggle
-        panel.querySelectorAll('.ag-toggle-btn').forEach(btn => {
-            btn.onclick = () => {
-                agSelectedOctype = btn.dataset.octype;
-                localStorage.setItem('lastSelectedOctype', agSelectedOctype);
-                panel.querySelector('#ag-btn-normal').className   = 'ag-toggle-btn' + (agSelectedOctype === 'N' ? ' active-normal'   : '');
-                panel.querySelector('#ag-btn-overtime').className = 'ag-toggle-btn' + (agSelectedOctype === 'O' ? ' active-overtime' : '');
-            };
-        });
-
-        // Submit
-        panel.querySelector('#apmgod-submit').onclick = () => submitForm();
+        $("#modal-dialog").remove();
     }
 
     function fillTimeFunction() {
@@ -417,7 +184,7 @@
         console.log("Time filling executed successfully!");
     }
 
-        // ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────
     // SECTION 2: Workorder AutoFill ALT+3
     //            (Username + ShiftGroup beim Start)
     // ─────────────────────────────────────────────
@@ -762,11 +529,15 @@
     // SECTION 5: Key Listeners ALT+4
     // ─────────────────────────────────────────────
 
-    document.addEventListener('keydown', function (event) {
-        if (event.altKey && event.key === '4') {
+    $(document).keydown(function (event) {
+        if (event.altKey && event.which === 52) {
             event.preventDefault();
-            if (!document.getElementById('apmgod-panel')) showModalDialog();
+            if ($("#modal-dialog").length === 0) showModalDialog();
             fillTimeFunction();
+        }
+        if (event.which === 13 && $("#modal-dialog").length > 0) {
+            event.preventDefault();
+            submitForm();
         }
     });
 
@@ -873,31 +644,4 @@
 
     console.log('[EAM AutoConfirm] Script aktiv – überwacht auf Date-Worked-Dialog (EN + DE).');
 
-
-    // ─────────────────────────────────────────────
-    // AUTO-YES: "No valid Rate" Dialog automatisch bestätigen
-    // ─────────────────────────────────────────────
-    (function() {
-        const observer = new MutationObserver(mutations => {
-            for (const m of mutations) {
-                for (const node of m.addedNodes) {
-                    if (node.nodeType !== 1) continue;
-                    const h6 = node.matches?.('.x-message-box') ? node.querySelector('h6')
-                              : node.querySelector?.('.x-message-box h6');
-                    if (!h6 || (!h6.textContent.includes('No valid Rate') && !h6.textContent.includes('Unable to retrieve records'))) continue;
-                    const box = h6.closest('.x-message-box') || node;
-                    // sofort unsichtbar + mask entfernen
-                    box.style.display = 'none';
-                    // EAM mask (overlay hinter dem dialog) auch weg
-                    const mask = document.querySelector('.x-mask:last-of-type');
-                    if (mask) mask.style.display = 'none';
-                    const yesBtn = box.querySelector('.uft-id-yes');
-                    if (yesBtn) yesBtn.click();
-                }
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    })();
-
 })();
-
