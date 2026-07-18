@@ -767,8 +767,9 @@
     // SECTION 7: Auto-Confirm "Date Worked outside range" (EN + DE)
     // ─────────────────────────────────────────────
 
-    const TARGET_TEXT_EN = 'Date Worked falls outside of the scheduled date range for this activity';
-    const TARGET_TEXT_DE = "Das 'Arbeitsdatum' liegt außerhalb des eingeplanten Datumsbereichs";
+    const TARGET_TEXT_EN   = 'Date Worked falls outside of the scheduled date range for this activity';
+    const TARGET_TEXT_DE   = "Das 'Arbeitsdatum' liegt außerhalb des eingeplanten Datumsbereichs";
+    const TARGET_TEXT_RATE = 'No valid Rate exists for this Department, Trade, Date Worked, and Occupation Type';
 
     function checkAndDismiss() {
         const dialogs = document.querySelectorAll('.x-message-box.x-window');
@@ -776,7 +777,9 @@
             if (dialog.getAttribute('aria-hidden') === 'true') return;
 
             const textContent = dialog.innerText || dialog.textContent || '';
-            const isMatch = textContent.includes(TARGET_TEXT_EN) || textContent.includes(TARGET_TEXT_DE);
+            const isMatch = textContent.includes(TARGET_TEXT_EN)
+                         || textContent.includes(TARGET_TEXT_DE)
+                         || textContent.includes(TARGET_TEXT_RATE);
             if (!isMatch) return;
 
             const yesBtn = dialog.querySelector('a.uft-id-yes');
