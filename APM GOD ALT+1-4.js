@@ -197,7 +197,7 @@
         injectPanelStyles();
 
         const storedEmployee = localStorage.getItem('lastSelectedEmployee') || names[0];
-        const storedDate     = localStorage.getItem('lastSelectedDatework') || getFormattedToday();
+        const storedDate     = getFormattedToday();
         agSelectedOctype     = localStorage.getItem('lastSelectedOctype')   || 'N';
         agSelectedHours      = localStorage.getItem('lastSelectedHrswork')  || '1';
 
@@ -252,6 +252,14 @@
                 <button class="ag-submit-btn" id="apmgod-submit">Arbeit buchen</button>
             </div>
         `;
+        // Position wiederherstellen
+        const savedPanelTop  = localStorage.getItem('apmgod_panel_top');
+        const savedPanelLeft = localStorage.getItem('apmgod_panel_left');
+        if (savedPanelTop && savedPanelLeft) {
+            panel.style.top   = savedPanelTop;
+            panel.style.left  = savedPanelLeft;
+            panel.style.right = 'auto';
+        }
         document.body.appendChild(panel);
 
         // Apply correct initial octype toggle state
@@ -276,7 +284,14 @@
             panel.style.top   = (e.clientY - oy) + 'px';
             panel.style.right = 'auto';
         });
-        document.addEventListener('mouseup', () => { dragging = false; });
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                const r = panel.getBoundingClientRect();
+                localStorage.setItem('apmgod_panel_top',  r.top  + 'px');
+                localStorage.setItem('apmgod_panel_left', r.left + 'px');
+            }
+            dragging = false;
+        });
 
         // Close
         panel.querySelector('.ag-close').onclick = () => panel.remove();
@@ -788,7 +803,13 @@
             if (yesBtn.style.display === 'none') return;
 
             console.log('[EAM AutoConfirm] Dialog erkannt – klicke automatisch "Yes/Ja"');
-            yesBtn.click();
+            // ExtJS-Component via compId feuern (zuverlässiger als DOM .click())
+            try {
+                const compId = yesBtn.getAttribute('data-componentid');
+                const extBtn = (typeof unsafeWindow !== 'undefined' ? unsafeWindow.Ext : Ext).getCmp(compId);
+                if (extBtn) { extBtn.fireEvent('click', extBtn); return; }
+            } catch(e) {}
+            yesBtn.click(); // DOM-Fallback
         });
     }
 
