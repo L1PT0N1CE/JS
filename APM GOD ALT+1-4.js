@@ -157,6 +157,45 @@
         return agSelectedHours;
     }
 
+    function clickEamBookButton() {
+        // EAM toolbar save/book is the green save icon — uft-id-save is the standard EAM save action
+        // Try all known uft-id patterns for this button
+        const uftCandidates = ['save', 'book', 'booklabor', 'add', 'accept'];
+        for (const id of uftCandidates) {
+            const el = document.querySelector(`a.uft-id-${id}`);
+            if (el && el.offsetParent !== null && !el.closest('.x-item-disabled')) {
+                el.click();
+                console.log('[APM-GOD] Book via uft-id-' + id);
+                return true;
+            }
+        }
+
+        // ExtJS: find the first enabled toolbar button (save icon has no text, just icon class)
+        if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
+            // Look for toolbar button with save-related iconCls or action
+            const toolbars = Ext.ComponentQuery.query('toolbar');
+            for (const tb of toolbars) {
+                if (!tb.isVisible || !tb.isVisible()) continue;
+                const btns = tb.query('button');
+                for (const btn of btns) {
+                    const icon  = (btn.iconCls  || '').toLowerCase();
+                    const iid   = (btn.itemId   || '').toLowerCase();
+                    const tt    = (btn.tooltip  || '').toLowerCase();
+                    const txt   = (btn.text     || '').toLowerCase();
+                    if ((icon + iid + tt + txt).match(/save|book|accept|add/) && !btn.isDisabled()) {
+                        btn.el ? btn.el.dom.click() : btn.fireEvent('click', btn);
+                        console.log('[APM-GOD] Book via ExtJS btn', btn.itemId || btn.iconCls);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        console.warn('[APM-GOD] EAM Book-Button nicht gefunden — alle a[class*=uft-id]:');
+        document.querySelectorAll('a[class*="uft-id"]').forEach(a => console.log(a.className));
+        return false;
+    }
+
     function submitForm() {
         const panel = document.getElementById('apmgod-panel');
         if (!panel) return;
@@ -183,6 +222,9 @@
         }
 
         panel.remove();
+
+        // Give EAM 150ms to register field values, then click Book
+        setTimeout(clickEamBookButton, 150);
     }
 
     function showModalDialog() {
@@ -254,6 +296,17 @@
         `;
         document.body.appendChild(panel);
 
+        // Restore saved panel position (remember last drag position)
+        const savedPos = localStorage.getItem('apmgod-panel-pos');
+        if (savedPos) {
+            try {
+                const pos = JSON.parse(savedPos);
+                panel.style.left  = pos.left;
+                panel.style.top   = pos.top;
+                panel.style.right = 'auto';
+            } catch (e) {}
+        }
+
         // Apply correct initial octype toggle state
         const btnNormal   = panel.querySelector('#ag-btn-normal');
         const btnOvertime = panel.querySelector('#ag-btn-overtime');
@@ -276,10 +329,32 @@
             panel.style.top   = (e.clientY - oy) + 'px';
             panel.style.right = 'auto';
         });
-        document.addEventListener('mouseup', () => { dragging = false; });
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                const r = panel.getBoundingClientRect();
+                localStorage.setItem('apmgod-panel-pos', JSON.stringify({
+                    left: r.left + 'px',
+                    top:  r.top  + 'px'
+                }));
+            }
+            dragging = false;
+        });
+
+        // Enter key anywhere while panel is open = submit (capture phase so EAM can't block it)
+        const agEnterHandler = e => {
+            if ((e.key === 'Enter' || e.which === 13) && document.getElementById('apmgod-panel')) {
+                e.preventDefault();
+                e.stopPropagation();
+                submitForm();
+            }
+        };
+        document.addEventListener('keydown', agEnterHandler, true);
 
         // Close
-        panel.querySelector('.ag-close').onclick = () => panel.remove();
+        panel.querySelector('.ag-close').onclick = () => {
+            document.removeEventListener('keydown', agEnterHandler, true);
+            panel.remove();
+        };
 
         // Preset buttons: click = select, dblclick = select + book
         panel.querySelectorAll('.ag-preset-btn').forEach(btn => {
@@ -687,15 +762,11 @@
     // SECTION 5: Key Listeners ALT+4
     // ─────────────────────────────────────────────
 
-    $(document).keydown(function (event) {
-        if (event.altKey && event.which === 52) {
+    document.addEventListener('keydown', function (event) {
+        if (event.altKey && event.key === '4') {
             event.preventDefault();
-            if ($("#apmgod-panel").length === 0) showModalDialog();
+            if (!document.getElementById('apmgod-panel')) showModalDialog();
             fillTimeFunction();
-        }
-        if (event.which === 13 && $("#apmgod-panel").length > 0) {
-            event.preventDefault();
-            submitForm();
         }
     });
 
