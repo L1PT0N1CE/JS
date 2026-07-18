@@ -876,47 +876,35 @@
     console.log('[EAM AutoConfirm] Script aktiv – überwacht auf Date-Worked-Dialog (EN + DE).');
 
     // ─────────────────────────────────────────────
-    // SECTION 8: Teilesuche ALT+5
+    // ─────────────────────────────────────────────
+    // SECTION 8: Teilesuche ALT+5 — 1:1 APM Master
     // ─────────────────────────────────────────────
 
-    // Shared localStorage key with Partnumbers script (partcodeMap_v3)
+    // Shared storage with Partnumbers script
     const TS_KEY = 'partcodeMap_v3';
 
-    function tsLoadMap() {
-        try { const s = localStorage.getItem(TS_KEY); if (s) return JSON.parse(s); } catch(e) {}
-        return [];
+    function tsLoad() {
+        try { return JSON.parse(localStorage.getItem(TS_KEY)) || []; } catch(e) { return []; }
     }
-    function tsSaveMap(m) {
-        try { localStorage.setItem(TS_KEY, JSON.stringify(m)); return true; } catch(e) { return false; }
-    }
+    function tsSave(m) {
+        try { localStorage.setItem(TS_KEY, JSON.stringify(m)); } catch(e) {} }
 
     function tsGetSession() {
-        try {
-            const p = new URLSearchParams(window.location.search), e = p.get('eamid'), t = p.get('tenant');
-            if (e) return { eamid: e, tenant: t || 'AMAZONRMEEU_PRD' };
-        } catch(_) {}
-        try {
-            const win = window !== window.top ? window.top : window;
-            const f = win.document.querySelector('iframe[src*="eamid="]');
-            if (f) { const p2 = new URL(f.src).searchParams; const e = p2.get('eamid'); if (e) return { eamid: e, tenant: p2.get('tenant') || 'AMAZONRMEEU_PRD' }; }
-        } catch(_) {}
-        try {
-            const cat = window.APMApi?.get?.('partsCatalog');
-            if (cat?.getImageUrl) { const url = cat.getImageUrl('x') || ''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return { eamid: m[1], tenant: 'AMAZONRMEEU_PRD' }; }
-        } catch(_) {}
+        try { const p = new URLSearchParams(window.location.search), e = p.get('eamid'), t = p.get('tenant'); if (e) return {eamid:e,tenant:t||'AMAZONRMEEU_PRD'}; } catch(_){}
+        try { const top = window !== window.top ? window.top : window, f = top.document.querySelector('iframe[src*="eamid="]'); if (f) { const p2 = new URL(f.src).searchParams, e = p2.get('eamid'); if (e) return {eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'}; } } catch(_){}
+        try { const cat = window.APMApi?.get?.('partsCatalog'); if (cat?.getImageUrl) { const url = cat.getImageUrl('x')||''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return {eamid:m[1],tenant:'AMAZONRMEEU_PRD'}; } } catch(_){}
         return null;
     }
 
-    async function tsSearch(partcode, description) {
+    async function tsSearch(partcode, description, dataspyId) {
         const s = tsGetSession();
-        if (!s) { console.warn('[Teilesuche] Session nicht gefunden'); return []; }
-        const pq = (partcode || '').trim(), dq = (description || '').trim();
+        if (!s) return [];
+        const pq = (partcode||'').trim(), dq = (description||'').trim();
         if (!pq && !dq) return [];
         const params = {
-            GRID_NAME: 'SSPART', USER_FUNCTION_NAME: 'SSPART', SYSTEM_FUNCTION_NAME: 'SSPART',
-            CURRENT_TAB_NAME: 'LST', COMPONENT_INFO_TYPE: 'DATA_ONLY',
-            FORCE_REQUERY: 'YES', MAX_ROWS: '50',
-            DATASPY_ID: '101496', GRID_ID: '80',
+            GRID_NAME:'SSPART', USER_FUNCTION_NAME:'SSPART', SYSTEM_FUNCTION_NAME:'SSPART',
+            CURRENT_TAB_NAME:'LST', COMPONENT_INFO_TYPE:'DATA_ONLY', FORCE_REQUERY:'YES', MAX_ROWS:'50',
+            DATASPY_ID: dataspyId || '101496', GRID_ID:'80',
             eamid: s.eamid, tenant: s.tenant,
         };
         let seq = 1;
@@ -924,20 +912,19 @@
         if (dq) { params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description'; params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS'; params[`MADDON_FILTER_VALUE_${seq}`]=dq; params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq); params[`MADDON_FILTER_JOINER_${seq}`]='AND'; params[`MADDON_LPAREN_${seq}`]='false'; params[`MADDON_RPAREN_${seq}`]='false'; seq++; }
         try {
             const r = await fetch('https://eu1.eam.hxgnsmartcloud.com/web/base/SSPART.xmlhttp', {
-                method: 'POST', credentials: 'include',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+                method:'POST', credentials:'include',
+                headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
                 body: new URLSearchParams(params).toString()
             });
             const json = JSON.parse(await r.text());
-            if (json?.pageData?.messages?.some(m => m.type === 'error')) { console.warn('[Teilesuche] EAM Error:', json.pageData.messages[0]?.msg); return []; }
             const rows = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA || [];
             const seen = new Set();
-            return rows.filter(row => { const p = row.partcode || ''; if (!p || seen.has(p)) return false; seen.add(p); return true; }).map(row => ({
+            return rows.filter(row => { const p = row.partcode||''; if (!p||seen.has(p)) return false; seen.add(p); return true; }).map(row => ({
                 part:     row.partcode         || '',
                 desc:     row.description      || row.partdescription || '',
                 uom:      row.uom              || '',
-                bestand:  row.qty              || row.balance         || row.stockbalance || row.quantity || '',
-                lager:    row.storeroom        || row.store           || '',
+                bestand:  row.qty              || row.balance         || row.stockbalance || '',
+                lager:    row.numberOfStores   || row.storecount      || '',
                 lagerort: row.bin              || row.storelocation   || row.location     || '',
                 pic:      row.profilepicture   || '',
                 eamid:    s.eamid,
@@ -945,344 +932,437 @@
         } catch(e) { console.warn('[Teilesuche]', e.message); return []; }
     }
 
-    function tsMk(tag, style) { const e = document.createElement(tag); if (style) e.style.cssText = style; return e; }
-
     function tsToast(msg) {
-        const t = tsMk('div', 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a2a3a;border:1px solid #2a4060;color:#c0d8f8;padding:10px 22px;border-radius:6px;font-size:13px;z-index:2000000;box-shadow:0 4px 12px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;');
+        const t = document.createElement('div');
+        t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--apm-surface-0,#1a2332);border:1px solid var(--apm-border,#2a3447);color:var(--apm-text-primary,#c8d4e8);padding:9px 20px;border-radius:6px;font-size:13px;z-index:2000000;box-shadow:0 4px 16px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;font-family:inherit;';
         t.textContent = msg;
         document.body.appendChild(t);
-        setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2000);
+        setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(() => t.remove(), 320); }, 2000);
     }
 
-    function tsRenderSaved(container) {
-        const map = tsLoadMap();
-        container.innerHTML = '';
-        if (!map.length) {
-            const emp = tsMk('div', 'padding:20px;text-align:center;color:#475569;font-size:12px;font-style:italic;');
-            emp.textContent = 'Keine gespeicherten Teile';
-            container.appendChild(emp);
-            return;
-        }
-        // Group by first letter of key (like APM Master's AR group)
-        const groups = {};
-        map.forEach(e => {
-            const g = (e.key || e.part || '?')[0].toUpperCase();
-            if (!groups[g]) groups[g] = [];
-            groups[g].push(e);
-        });
-        Object.keys(groups).sort().forEach(g => {
-            const ghdr = tsMk('div', 'padding:4px 14px;background:#0f1621;color:#3b82f6;font-size:11px;font-weight:700;letter-spacing:.6px;cursor:pointer;user-select:none;');
-            ghdr.textContent = g;
-            container.appendChild(ghdr);
-            groups[g].forEach(entry => {
-                const row = tsMk('div', 'display:grid;grid-template-columns:80px 1fr 80px 48px 80px;padding:7px 14px;border-bottom:1px solid #1e2a3a;align-items:center;font-size:12px;gap:8px;transition:background .1s;');
-                row.addEventListener('mouseenter', () => row.style.background = '#1e2a3c');
-                row.addEventListener('mouseleave', () => row.style.background = '');
+    // SVG icons (matching APM Master)
+    const TS_SVG_CARET   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+    const TS_SVG_CLOSE   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    const TS_SVG_COPY    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    const TS_SVG_PLUS    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+    const TS_SVG_CHECK   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const TS_SVG_REMOVE  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`;
 
-                const pCell = tsMk('span', 'color:#60a5fa;font-weight:700;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;');
-                pCell.textContent = entry.part;
-                pCell.title = 'Klicken zum Kopieren';
-                pCell.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
+    // Fallback CSS for when APM Master isn't loaded (uses same var names with hardcoded fallbacks)
+    function tsInjectFallbackCSS() {
+        if (document.getElementById('apmgod-ts-fallback')) return;
+        // Only inject if APM Master's CSS is missing
+        if (getComputedStyle(document.documentElement).getPropertyValue('--apm-surface-0').trim()) return;
+        const s = document.createElement('style');
+        s.id = 'apmgod-ts-fallback';
+        s.textContent = ':root{--apm-surface-0:#1e2738;--apm-surface-inset:#151b27;--apm-surface-sunken:#0f1621;--apm-surface-raised:#252f42;--apm-border:#2a3447;--apm-text-primary:#c8d4e8;--apm-text-bright:#e2e8f0;--apm-text-muted:#64748b;--apm-text-disabled:#475569;--apm-text-secondary:#94a3b8;--apm-accent:#3b82f6;--apm-accent-hover:#2563eb;--apm-danger:#ef4444;--apm-overlay-light:rgba(255,255,255,.05);--apm-control-bg:rgba(255,255,255,.08);--apm-font-mono:monospace;--apm-text-xs:11px;--apm-text-sm:12px;--apm-text-base:13px;--apm-text-md:13px;--apm-text-lg:15px;--apm-radius-sm:4px;--apm-radius:6px;--apm-radius-lg:8px;--apm-shadow:0 4px 16px rgba(0,0,0,.4);--apm-field-bg:#0f1621;--apm-field-border:#2a3447;--apm-field-text:#c8d4e8;--apm-input-focus:rgba(59,130,246,.25);--apm-input-bg:#0f1621;}';
+        document.head.appendChild(s);
+    }
 
-                const dCell = tsMk('span', 'color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;');
-                dCell.textContent = entry.desc || entry.key;
+    function tsEl(tag, cls, style) {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (style) e.style.cssText = style;
+        return e;
+    }
 
-                const kCell = tsMk('span', 'color:#475569;font-size:11px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;');
-                kCell.textContent = entry.key;
+    function tsActionBtn(icon, title, extraCls) {
+        const b = tsEl('button', `apm-btn apm-btn--neutral${extraCls?' '+extraCls:''}`,
+            'display:inline-flex;align-items:center;justify-content:center;width:28px;height:26px;padding:0;cursor:pointer;border-radius:var(--apm-radius-sm,4px);border:1px solid var(--apm-border,#2a3447);background:transparent;color:var(--apm-text-secondary,#94a3b8);transition:color .12s,border-color .12s,background .12s;');
+        b.innerHTML = icon;
+        b.title = title;
+        b.addEventListener('mouseenter', () => { b.style.color='var(--apm-text-primary,#e2e8f0)'; b.style.background='var(--apm-control-bg,rgba(255,255,255,.08))'; });
+        b.addEventListener('mouseleave', () => { b.style.color='var(--apm-text-secondary,#94a3b8)'; b.style.background='transparent'; });
+        return b;
+    }
 
-                const uCell = tsMk('span', 'color:#475569;font-size:11px;');
-                uCell.textContent = entry.uom || '';
+    // Build one data row (display:contents — cells are direct grid children)
+    function tsMakeRow(grid, cells8, isHovered) {
+        const row = tsEl('div', 'apm-pb-row');
+        cells8.forEach(c => row.appendChild(c));
+        row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
+        row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
+        grid.appendChild(row);
+        return row;
+    }
 
-                const actions = tsMk('div', 'display:flex;gap:4px;align-items:center;justify-content:flex-end;');
+    function tsCell(extraCls) {
+        return tsEl('div', `apm-pb-cell apm-pb-cell-${extraCls}`);
+    }
 
-                // Copy button
-                const cpBtn = tsMk('button', 'width:26px;height:26px;background:#1d4ed8;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;');
-                cpBtn.textContent = '📋'; cpBtn.title = 'Kopieren';
-                cpBtn.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
-
-                // Delete button
-                const dlBtn = tsMk('button', 'width:26px;height:26px;background:#7f1d1d;border:1px solid #ef4444;border-radius:4px;color:#fca5a5;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;');
-                dlBtn.textContent = '×'; dlBtn.title = 'Entfernen';
-                dlBtn.onclick = () => {
-                    const cur = tsLoadMap();
-                    const idx = cur.findIndex(e => e.part === entry.part && e.key === entry.key);
-                    if (idx >= 0) { cur.splice(idx, 1); tsSaveMap(cur); }
-                    row.remove();
-                    tsToast(`🗑️ "${entry.part}" entfernt`);
-                };
-
-                actions.appendChild(cpBtn);
-                actions.appendChild(dlBtn);
-                [pCell, dCell, kCell, uCell, actions].forEach(c => row.appendChild(c));
-                container.appendChild(row);
+    function tsImgCell(r) {
+        const c = tsCell('image');
+        if (r.pic) {
+            const img = tsEl('img', 'apm-pb-row-img is-clickable');
+            img.src = `https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${r.eamid}&tenant=AMAZONRMEEU_PRD`;
+            img.alt = '';
+            img.title = 'Zum Vergrößern klicken';
+            img.addEventListener('click', () => {
+                const overlay = tsEl('div', '', 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000001;display:flex;align-items:center;justify-content:center;cursor:zoom-out;');
+                const big = tsEl('img', '', 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;');
+                big.src = img.src;
+                overlay.appendChild(big);
+                overlay.onclick = () => overlay.remove();
+                document.body.appendChild(overlay);
             });
+            c.appendChild(img);
+        } else {
+            const ph = tsEl('div', 'apm-pb-img-placeholder');
+            ph.textContent = '—';
+            c.appendChild(ph);
+        }
+        return c;
+    }
+
+    function tsPartCell(part, eamid) {
+        const c = tsCell('part');
+        c.dataset.apmTip = part;
+        const link = tsEl('a', 'apm-ps-part-link');
+        link.href = `https://eu1.eam.hxgnsmartcloud.com/web/base/logindisp?tenant=AMAZONRMEEU_PRD&SYSTEM_FUNCTION_NAME=SSPART&USER_FUNCTION_NAME=SSPART&DRILLBACK=YES&partcode=${encodeURIComponent(part)}`;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.title = `${part} in neuem Tab öffnen`;
+        link.textContent = part;
+        const copyIcon = tsEl('span', 'apm-copy-icon', 'margin-left:6px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
+        copyIcon.innerHTML = TS_SVG_COPY;
+        copyIcon.title = 'APN kopieren';
+        copyIcon.addEventListener('mouseenter', () => copyIcon.style.opacity = '1');
+        copyIcon.addEventListener('mouseleave', () => copyIcon.style.opacity = '.5');
+        copyIcon.onclick = (e) => { e.preventDefault(); navigator.clipboard.writeText(part); tsToast(`📋 ${part} kopiert`); };
+        c.appendChild(link);
+        c.appendChild(copyIcon);
+        return c;
+    }
+
+    function tsDescCell(part, desc) {
+        const c = tsCell('desc');
+        c.dataset.apn = part;
+        const span = tsEl('span', 'apm-ps-desc-text');
+        span.textContent = desc;
+        span.title = desc;
+        const copyIcon = tsEl('span', 'apm-copy-icon apm-copy-title-icon', 'margin-left:4px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
+        copyIcon.innerHTML = TS_SVG_COPY;
+        copyIcon.title = 'APN + Beschreibung kopieren';
+        copyIcon.addEventListener('mouseenter', () => copyIcon.style.opacity = '1');
+        copyIcon.addEventListener('mouseleave', () => copyIcon.style.opacity = '.5');
+        copyIcon.onclick = () => { navigator.clipboard.writeText(`${part} – ${desc}`); tsToast(`📋 ${part} + Beschreibung kopiert`); };
+        c.appendChild(span);
+        c.appendChild(copyIcon);
+        return c;
+    }
+
+    function tsRebuildGrid(searchResults) {
+        const body = document.getElementById('apmgod-ts-body');
+        if (!body) return;
+        body.innerHTML = '';
+
+        const grid = tsEl('div', 'apm-pb-grid');
+        grid.id = 'apmgod-ts-grid';
+        grid.style.gridTemplateColumns = '52px minmax(110px, 1fr) minmax(180px, 2.2fr) 58px 64px 56px minmax(76px, 1fr) 210px';
+
+        // ── Column header row ──
+        const hdrRow = tsEl('div', 'apm-pb-row apm-pb-row-header');
+        [['image','Bild'],['part','Teil'],['desc','Beschreibung'],['instock','Bestand'],['stores','Lager'],['uom','UOM'],['location','Lagerort'],['actions','Aktionen']].forEach(([col, label]) => {
+            const th = tsEl('div', `apm-pb-col-header apm-pb-cell-${col}`);
+            th.dataset.col = col;
+            const lbl = tsEl('div', 'apm-pb-col-label');
+            lbl.textContent = label;
+            th.appendChild(lbl);
+            hdrRow.appendChild(th);
         });
+        grid.appendChild(hdrRow);
+
+        // ── Search results ──
+        if (Array.isArray(searchResults)) {
+            const secLbl = tsEl('div', 'apm-pb-section-label');
+            secLbl.textContent = searchResults.length > 0 ? `Suchergebnisse (${searchResults.length})` : '';
+            if (searchResults.length === 0) {
+                secLbl.className = 'apm-pb-empty';
+                secLbl.textContent = 'Keine Treffer — Parts in my Stores · FRA7';
+            }
+            grid.appendChild(secLbl);
+
+            if (searchResults.length > 0) {
+                const saved = tsLoad();
+                searchResults.forEach(r => {
+                    const isSaved = saved.some(e => e.part === r.part);
+                    const row = tsEl('div', 'apm-pb-row');
+                    if (isSaved) row.style.opacity = '.55';
+                    row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
+                    row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
+
+                    // instock cell
+                    const instock = tsCell('instock'); instock.textContent = r.bestand || '—';
+                    // stores cell
+                    const stores = tsCell('stores'); stores.textContent = r.lager || '—';
+                    if (r.lager) stores.title = `${r.lager} Lager`;
+                    // uom cell
+                    const uom = tsCell('uom'); uom.textContent = r.uom;
+                    // location cell
+                    const loc = tsCell('location');
+                    const locSpan = tsEl('span', 'apm-ps-loc-text'); locSpan.textContent = r.lagerort || '—';
+                    if (r.lagerort) {
+                        const locCopy = tsEl('span', 'apm-copy-icon', 'margin-left:6px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
+                        locCopy.innerHTML = TS_SVG_COPY;
+                        locCopy.title = 'Lagerort kopieren';
+                        locCopy.addEventListener('mouseenter', () => locCopy.style.opacity = '1');
+                        locCopy.addEventListener('mouseleave', () => locCopy.style.opacity = '.5');
+                        locCopy.onclick = () => { navigator.clipboard.writeText(`APN: ${r.part}\nBeschreibung: ${r.desc}\nMenge: ${r.bestand}\nLagerort: ${r.lagerort}`); tsToast('📋 Details kopiert'); };
+                        loc.appendChild(locSpan); loc.appendChild(locCopy);
+                    } else { loc.appendChild(locSpan); }
+
+                    // actions cell
+                    const act = tsCell('actions');
+                    const addBtn = tsActionBtn(TS_SVG_PLUS, 'Zu gespeicherten Teilen hinzufügen');
+                    const ckBtn  = tsActionBtn(TS_SVG_CHECK, 'Bereits gespeichert');
+                    const rmBtn  = tsActionBtn(TS_SVG_REMOVE, 'Entfernen');
+                    rmBtn.addEventListener('mouseenter', () => { rmBtn.style.color='var(--apm-danger,#ef4444)'; });
+                    rmBtn.addEventListener('mouseleave', () => { rmBtn.style.color='var(--apm-text-secondary,#94a3b8)'; rmBtn.style.background='transparent'; });
+
+                    if (isSaved) {
+                        act.appendChild(ckBtn); act.appendChild(rmBtn);
+                        rmBtn.onclick = () => {
+                            const cur = tsLoad(); const idx = cur.findIndex(e => e.part === r.part);
+                            if (idx >= 0) { cur.splice(idx, 1); tsSave(cur); }
+                            row.style.opacity = '1'; ckBtn.remove(); rmBtn.remove(); act.appendChild(addBtn);
+                            tsRebuildGrid(searchResults);
+                            tsToast(`🗑️ "${r.part}" entfernt`);
+                        };
+                    } else {
+                        act.appendChild(addBtn);
+                        addBtn.onclick = () => {
+                            const alias = (prompt(`Alias für "${r.part}":\n(leer = Partnummer als Key)`, r.part.toLowerCase()) ?? '').trim();
+                            const key = alias || r.part.toLowerCase();
+                            const cur = tsLoad();
+                            if (!cur.some(e => e.part === r.part)) { cur.push({key, part:r.part, desc:r.desc, uom:r.uom}); tsSave(cur); }
+                            row.style.opacity = '.55'; addBtn.remove(); act.appendChild(ckBtn); act.appendChild(rmBtn);
+                            rmBtn.onclick = () => {
+                                const cur2 = tsLoad(); const idx = cur2.findIndex(e => e.part === r.part);
+                                if (idx >= 0) { cur2.splice(idx, 1); tsSave(cur2); }
+                                row.style.opacity = '1'; ckBtn.remove(); rmBtn.remove(); act.appendChild(addBtn);
+                                tsRebuildGrid(searchResults);
+                                tsToast(`🗑️ "${r.part}" entfernt`);
+                            };
+                            tsRebuildGrid(searchResults);
+                            tsToast(`✅ "${r.part}" gespeichert als "${key}"`);
+                        };
+                    }
+
+                    [tsImgCell(r), tsPartCell(r.part, r.eamid), tsDescCell(r.part, r.desc), instock, stores, uom, loc, act].forEach(c => row.appendChild(c));
+                    grid.appendChild(row);
+                });
+            }
+        }
+
+        // ── Gespeicherte Teile ──
+        const saved = tsLoad();
+        const secSaved = tsEl('div', 'apm-pb-section-label');
+        secSaved.textContent = 'Gespeicherte Teile';
+        grid.appendChild(secSaved);
+
+        if (saved.length === 0) {
+            const empty = tsEl('div', 'apm-pb-empty');
+            empty.textContent = 'Keine gespeicherten Teile';
+            grid.appendChild(empty);
+        } else {
+            // Group by first letter of key
+            const groups = {};
+            saved.forEach(e => { const g = (e.key||e.part||'?')[0].toUpperCase(); (groups[g] = groups[g]||[]).push(e); });
+
+            Object.keys(groups).sort().forEach(gname => {
+                // Group header (grid-column: 1/-1)
+                const ghdr = tsEl('div', 'apm-pb-group-header');
+                const gleft = tsEl('span', 'apm-pb-group-left');
+                const gcaret = tsEl('span', 'apm-pb-group-caret'); gcaret.innerHTML = TS_SVG_CARET;
+                gleft.appendChild(gcaret);
+                const gcenter = tsEl('span', 'apm-pb-group-center');
+                const gname_el = tsEl('span', 'apm-pb-group-name'); gname_el.textContent = gname;
+                gcenter.appendChild(gname_el);
+                const gtools = tsEl('div', 'apm-pb-group-tools');
+                ghdr.appendChild(gleft); ghdr.appendChild(gcenter); ghdr.appendChild(gtools);
+
+                // Collapse toggle
+                let collapsed = false;
+                const rowEls = [];
+                ghdr.addEventListener('click', () => {
+                    collapsed = !collapsed;
+                    gcaret.style.transform = collapsed ? 'rotate(-90deg)' : '';
+                    rowEls.forEach(r => r.classList.toggle('is-hidden', collapsed));
+                });
+                grid.appendChild(ghdr);
+
+                // Rows
+                groups[gname].forEach(entry => {
+                    const row = tsEl('div', 'apm-pb-row');
+                    row.dataset.apn = entry.part; row.dataset.section = 'fav';
+                    row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
+                    row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
+                    rowEls.push(row);
+
+                    // Empty image cell (saved parts usually have no live image)
+                    const imgC = tsCell('image');
+                    imgC.innerHTML = '<div class="apm-pb-img-placeholder" style="width:40px;height:40px;border-radius:var(--apm-radius-sm,4px);background:var(--apm-surface-sunken,#0f1621);display:flex;align-items:center;justify-content:center;color:var(--apm-text-disabled,#475569);font-size:11px;">—</div>';
+
+                    // Desc & location empty for saved (no live data)
+                    const instock = tsCell('instock'); instock.textContent = '—';
+                    const stores  = tsCell('stores');  stores.textContent  = '—';
+                    const uom     = tsCell('uom');     uom.textContent     = entry.uom || '—';
+                    const loc     = tsCell('location');
+                    const locSpan = tsEl('span', 'apm-ps-loc-text', 'color:var(--apm-text-disabled,#475569);font-style:italic;');
+                    locSpan.textContent = '—';
+                    loc.appendChild(locSpan);
+
+                    // Actions
+                    const act = tsCell('actions');
+                    const cpBtn = tsActionBtn(TS_SVG_COPY,   'Partnummer kopieren');
+                    const rmBtn = tsActionBtn(TS_SVG_REMOVE, 'Entfernen');
+                    rmBtn.addEventListener('mouseenter', () => rmBtn.style.color = 'var(--apm-danger,#ef4444)');
+                    rmBtn.addEventListener('mouseleave', () => { rmBtn.style.color = 'var(--apm-text-secondary,#94a3b8)'; rmBtn.style.background = 'transparent'; });
+                    cpBtn.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
+                    rmBtn.onclick = () => {
+                        const cur = tsLoad(); const idx = cur.findIndex(e => e.part === entry.part && e.key === entry.key);
+                        if (idx >= 0) { cur.splice(idx, 1); tsSave(cur); }
+                        row.classList.add('is-hidden');
+                        tsToast(`🗑️ "${entry.part}" entfernt`);
+                        tsRebuildGrid(searchResults);
+                    };
+                    act.appendChild(cpBtn); act.appendChild(rmBtn);
+
+                    [imgC, tsPartCell(entry.part, null), tsDescCell(entry.part, entry.desc||entry.key), instock, stores, uom, loc, act].forEach(c => row.appendChild(c));
+                    grid.appendChild(row);
+                });
+            });
+        }
+
+        body.appendChild(grid);
     }
 
     function showTeilesuche() {
         if (document.getElementById('apmgod-teile-panel')) return;
+        tsInjectFallbackCSS();
 
-        // Inject styles
-        if (!document.getElementById('apmgod-teile-styles')) {
-            const s = document.createElement('style');
-            s.id = 'apmgod-teile-styles';
-            s.textContent = '#apmgod-teile-panel *{box-sizing:border-box} #apmgod-teile-panel ::-webkit-scrollbar{width:5px} #apmgod-teile-panel ::-webkit-scrollbar-track{background:#0f1621} #apmgod-teile-panel ::-webkit-scrollbar-thumb{background:#2a3447;border-radius:3px}';
-            document.head.appendChild(s);
-        }
+        const popup = document.createElement('div');
+        popup.id = 'apmgod-teile-panel';
+        // Reuse APM Master's CSS classes exactly
+        popup.className = 'apm-pb-popup apm-ps-popup apm-ui-panel';
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-label', 'Teilesuche');
+        popup.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);display:flex;visibility:visible;z-index:10001;';
 
-        const panel = tsMk('div', 'position:fixed;top:60px;left:50%;transform:translateX(-50%);width:820px;max-height:85vh;background:#1a2332;border:1px solid #2a3447;border-radius:8px;z-index:99998;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-size:13px;color:#c8d4e8;box-shadow:0 12px 48px rgba(0,0,0,.7);display:flex;flex-direction:column;user-select:none;');
-        panel.id = 'apmgod-teile-panel';
-
-        // ── Header ──
-        const hdr = tsMk('div', 'background:#151b27;border-bottom:1px solid #2a3447;border-radius:8px 8px 0 0;padding:10px 14px;display:flex;align-items:center;gap:10px;cursor:move;flex-shrink:0;');
-        const htitle = tsMk('span', 'font-size:14px;font-weight:700;color:#e2e8f0;flex:1;letter-spacing:.5px;');
-        htitle.textContent = 'Teilesuche';
-        const hclose = tsMk('button', 'background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:0 2px;line-height:1;transition:color .15s;');
-        hclose.textContent = '×';
-        hclose.onmouseover = () => hclose.style.color = '#ef4444';
-        hclose.onmouseout  = () => hclose.style.color = '#64748b';
-        hclose.onclick = () => panel.remove();
-        hdr.appendChild(htitle); hdr.appendChild(hclose);
-
-        // ── Search bar ──
-        const searchBar = tsMk('div', 'padding:10px 14px;background:#151b27;border-bottom:1px solid #2a3447;display:flex;gap:8px;align-items:center;flex-shrink:0;');
-        function mkInp(ph, w) {
-            const i = tsMk('input', `height:32px;padding:0 10px;background:#0f1621;border:1px solid #2a3447;border-radius:5px;color:#c8d4e8;font-size:12px;font-family:monospace;outline:none;${w ? 'width:' + w + ';flex-shrink:0;' : 'flex:1;'}`);
-            i.placeholder = ph;
-            i.addEventListener('focus',  () => i.style.borderColor = '#3b82f6');
-            i.addEventListener('blur',   () => i.style.borderColor = '#2a3447');
-            return i;
-        }
-        const pInp  = mkInp('Teile-Nr.', '180px');
-        const dInp  = mkInp('Beschreibung');
-        const mInp  = mkInp('Hersteller-Teile-Nr.', '180px');
-        const goBtn = tsMk('button', 'height:32px;padding:0 16px;background:#1d4ed8;border:none;border-radius:5px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:background .15s;');
-        goBtn.textContent = '🔍 Suchen';
-        goBtn.onmouseover = () => goBtn.style.background = '#1e40af';
-        goBtn.onmouseout  = () => goBtn.style.background = '#1d4ed8';
-        [pInp, dInp, mInp, goBtn].forEach(e => searchBar.appendChild(e));
-
-        // ── Status ──
-        const status = tsMk('div', 'padding:5px 14px;color:#475569;font-size:11px;font-style:italic;background:#151b27;border-bottom:1px solid #2a3447;flex-shrink:0;min-height:24px;');
-        status.textContent = 'Teile-Nr. und/oder Beschreibung eingeben → Enter oder Suchen';
-
-        // ── Col headers ──
-        const colHdr = tsMk('div', 'display:grid;grid-template-columns:48px 90px 1fr 70px 48px 110px 80px;padding:5px 14px;background:#0f1621;border-bottom:1px solid #2a3447;font-size:10px;font-weight:700;color:#475569;letter-spacing:.6px;text-transform:uppercase;flex-shrink:0;gap:8px;');
-        ['BILD','TEIL','BESCHREIBUNG','BESTAND','UOM','LAGERORT','AKTIONEN'].forEach(h => {
-            const c = tsMk('span'); c.textContent = h; colHdr.appendChild(c);
-        });
-
-        // ── Results area ──
-        const results = tsMk('div', 'overflow-y:auto;flex:1;background:#1a2332;min-height:80px;');
-
-        // ── Saved divider ──
-        const savedHdr = tsMk('div', 'padding:6px 14px;background:#0f1621;border-top:1px solid #2a3447;border-bottom:1px solid #2a3447;font-size:11px;font-weight:700;color:#475569;letter-spacing:.6px;flex-shrink:0;display:flex;align-items:center;gap:8px;');
-        savedHdr.innerHTML = '<span style="flex:1;text-align:center;letter-spacing:.8px;">— GESPEICHERTE TEILE —</span>';
-
-        // ── Saved col headers ──
-        const savedColHdr = tsMk('div', 'display:grid;grid-template-columns:80px 1fr 80px 48px 80px;padding:5px 14px;background:#0f1621;border-bottom:1px solid #2a3447;font-size:10px;font-weight:700;color:#475569;letter-spacing:.6px;text-transform:uppercase;flex-shrink:0;gap:8px;');
-        ['TEIL','BESCHREIBUNG','ALIAS','UOM','AKTIONEN'].forEach(h => {
-            const c = tsMk('span'); c.textContent = h; savedColHdr.appendChild(c);
-        });
-
-        // ── Saved list ──
-        const savedList = tsMk('div', 'overflow-y:auto;max-height:180px;background:#151b27;border-radius:0 0 8px 8px;flex-shrink:0;');
-        tsRenderSaved(savedList);
-
-        panel.appendChild(hdr);
-        panel.appendChild(searchBar);
-        panel.appendChild(status);
-        panel.appendChild(colHdr);
-        panel.appendChild(results);
-        panel.appendChild(savedHdr);
-        panel.appendChild(savedColHdr);
-        panel.appendChild(savedList);
-        document.body.appendChild(panel);
+        popup.innerHTML = `
+            <div class="apm-pb-header">
+                <span class="apm-pb-title">Teilesuche</span>
+                <div class="apm-pb-header-actions">
+                    <select class="apm-pb-dataspy-select apm-pb-site-select" id="apmgod-ts-site" title="Standort">
+                        <option value="">Alle Standorte</option>
+                        <option value="FRA7" selected>FRA7</option>
+                    </select>
+                    <label class="apm-pb-dataspy-label" style="font-size:var(--apm-text-sm,12px);color:var(--apm-text-muted,#64748b);white-space:nowrap;">Bereich:</label>
+                    <select id="apmgod-ts-dataspy" class="apm-pb-dataspy-select" title="Katalogbereich">
+                        <option value="82">All Parts</option>
+                        <option value="100455">Parts in Service</option>
+                        <option value="101496" selected>Parts in my Stores</option>
+                    </select>
+                    <button type="button" class="apm-pb-close" id="apmgod-ts-close" title="Schließen">×</button>
+                </div>
+            </div>
+            <div class="apm-pb-header-search">
+                <div class="apm-pb-header-search-label">Filialkatalog durchsuchen:</div>
+                <div class="apm-pb-search-group" style="display:flex;gap:6px;">
+                    <input id="apmgod-ts-part" type="search" placeholder="Teile-Nr." class="apm-pb-search apm-pb-search-multi">
+                    <input id="apmgod-ts-desc" type="search" placeholder="Beschreibung" class="apm-pb-search apm-pb-search-multi">
+                    <input id="apmgod-ts-mfr"  type="search" placeholder="Hersteller-Teile-Nr." class="apm-pb-search apm-pb-search-multi">
+                    <button id="apmgod-ts-clear" type="button" class="apm-pb-search-clear is-hidden">✕ Löschen</button>
+                </div>
+            </div>
+            <div class="apm-pb-body" id="apmgod-ts-body"></div>
+        `;
+        document.body.appendChild(popup);
 
         // Restore position
-        const savedPos = localStorage.getItem('apmgod-teile-pos');
-        if (savedPos) {
-            try {
-                const pos = JSON.parse(savedPos);
-                panel.style.left = pos.left; panel.style.top = pos.top; panel.style.transform = 'none';
-            } catch(e) {}
-        }
+        try {
+            const pos = JSON.parse(localStorage.getItem('apmgod-teile-pos') || 'null');
+            if (pos) { popup.style.left = pos.left; popup.style.top = pos.top; popup.style.transform = 'none'; }
+        } catch(e) {}
 
-        // Draggable
-        let dragging = false, ox = 0, oy = 0;
+        // Draggable on header
+        const hdr = popup.querySelector('.apm-pb-header');
+        let drag = false, ox = 0, oy = 0;
         hdr.addEventListener('mousedown', e => {
-            if (e.target === hclose) return;
-            dragging = true;
-            const r = panel.getBoundingClientRect();
+            if (e.target.closest('.apm-pb-close, select, button')) return;
+            drag = true; const r = popup.getBoundingClientRect();
             ox = e.clientX - r.left; oy = e.clientY - r.top;
+            popup.style.transform = 'none';
         });
-        document.addEventListener('mousemove', e => {
-            if (!dragging) return;
-            panel.style.left = (e.clientX - ox) + 'px'; panel.style.top = (e.clientY - oy) + 'px'; panel.style.transform = 'none';
-        });
+        document.addEventListener('mousemove', e => { if (!drag) return; popup.style.left = (e.clientX-ox)+'px'; popup.style.top = (e.clientY-oy)+'px'; });
         document.addEventListener('mouseup', () => {
-            if (dragging) {
-                const r = panel.getBoundingClientRect();
-                localStorage.setItem('apmgod-teile-pos', JSON.stringify({ left: r.left + 'px', top: r.top + 'px' }));
-            }
-            dragging = false;
+            if (drag) { const r = popup.getBoundingClientRect(); localStorage.setItem('apmgod-teile-pos', JSON.stringify({left:r.left+'px',top:r.top+'px'})); }
+            drag = false;
         });
 
-        // Search logic
+        // Close
+        popup.querySelector('#apmgod-ts-close').onclick = () => popup.remove();
+
+        // Search inputs
+        const pInp = popup.querySelector('#apmgod-ts-part');
+        const dInp = popup.querySelector('#apmgod-ts-desc');
+        const mInp = popup.querySelector('#apmgod-ts-mfr');
+        const clrBtn = popup.querySelector('#apmgod-ts-clear');
+        let searchTimer;
+
+        const updateClear = () => {
+            const hasVal = pInp.value || dInp.value || mInp.value;
+            clrBtn.classList.toggle('is-hidden', !hasVal);
+        };
+        clrBtn.onclick = () => { pInp.value = ''; dInp.value = ''; mInp.value = ''; updateClear(); tsRebuildGrid(); };
+
+        [pInp, dInp, mInp].forEach(inp => {
+            inp.addEventListener('input', () => {
+                updateClear();
+                clearTimeout(searchTimer);
+                if (pInp.value.trim() || dInp.value.trim()) searchTimer = setTimeout(doSearch, 350);
+            });
+            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(searchTimer); doSearch(); } });
+        });
+
         async function doSearch() {
             const pq = pInp.value.trim(), dq = dInp.value.trim();
             if (!pq && !dq) return;
-            status.style.color = '#3b82f6';
-            status.textContent = '⏳ Suche läuft…';
-            results.innerHTML = '';
-            const data = await tsSearch(pq, dq);
-            if (!data.length) { status.style.color = '#ef4444'; status.textContent = 'Keine Treffer in EAM (Parts in my Stores · FRA7)'; return; }
-            status.style.color = '#22c55e';
-            status.textContent = `${data.length} Treffer`;
-
-            const map = tsLoadMap();
-            data.forEach(r => {
-                const isSaved = map.some(e => e.part === r.part);
-                const row = tsMk('div', `display:grid;grid-template-columns:48px 90px 1fr 70px 48px 110px 80px;padding:7px 14px;border-bottom:1px solid #1e2a3a;align-items:center;font-size:12px;gap:8px;transition:background .1s;${isSaved ? 'opacity:.55;' : ''}`);
-                row.addEventListener('mouseenter', () => row.style.background = '#1e2a3c');
-                row.addEventListener('mouseleave', () => row.style.background = '');
-
-                // BILD
-                const imgCell = tsMk('div', 'width:40px;height:40px;display:flex;align-items:center;justify-content:center;');
-                if (r.pic) {
-                    const img = tsMk('img', 'width:38px;height:38px;object-fit:contain;border-radius:3px;border:1px solid #2a3447;cursor:zoom-in;transition:transform .15s;');
-                    img.src = `https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${r.eamid}`;
-                    img.onerror = () => { imgCell.textContent = '—'; imgCell.style.cssText += 'color:#475569;font-size:11px;'; };
-                    img.addEventListener('mouseenter', () => img.style.transform = 'scale(4) translateX(12px)');
-                    img.addEventListener('mouseleave', () => img.style.transform = '');
-                    imgCell.appendChild(img);
-                } else {
-                    imgCell.innerHTML = '<span style="color:#334;font-size:11px;">—</span>';
-                }
-
-                // TEIL
-                const partCell = tsMk('span', 'color:#60a5fa;font-weight:700;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;');
-                partCell.textContent = r.part;
-                partCell.title = 'Klicken zum Kopieren';
-                partCell.onclick = () => { navigator.clipboard.writeText(r.part); tsToast(`📋 ${r.part} kopiert`); };
-
-                // BESCHREIBUNG
-                const descCell = tsMk('span', 'color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;');
-                descCell.textContent = r.desc;
-
-                // BESTAND
-                const bestandCell = tsMk('span', 'color:#e2e8f0;font-weight:600;font-family:monospace;');
-                bestandCell.textContent = r.bestand || '—';
-
-                // UOM
-                const uomCell = tsMk('span', 'color:#475569;font-size:11px;');
-                uomCell.textContent = r.uom;
-
-                // LAGERORT
-                const lortCell = tsMk('span', 'color:#94a3b8;font-family:monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;');
-                lortCell.textContent = r.lagerort || r.lager || '—';
-
-                // AKTIONEN
-                const actCell = tsMk('div', 'display:flex;gap:4px;align-items:center;');
-
-                // Copy
-                const cpBtn = tsMk('button', 'width:26px;height:26px;background:#1d4ed8;border:none;border-radius:4px;color:white;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:background .15s;');
-                cpBtn.textContent = '📋'; cpBtn.title = 'Partnummer kopieren';
-                cpBtn.onclick = () => { navigator.clipboard.writeText(r.part); tsToast(`📋 ${r.part} kopiert`); };
-
-                // Save / Saved toggle
-                if (isSaved) {
-                    const ckBtn = tsMk('button', 'width:26px;height:26px;background:#1a2030;border:1px solid #2a3040;border-radius:4px;color:#22c55e;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:default;');
-                    ckBtn.textContent = '✓'; ckBtn.title = 'Bereits gespeichert';
-                    const rmBtn = tsMk('button', 'width:26px;height:26px;background:#7f1d1d;border:1px solid #ef4444;border-radius:4px;color:#fca5a5;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;');
-                    rmBtn.textContent = '−'; rmBtn.title = 'Entfernen';
-                    rmBtn.onclick = () => {
-                        const cur = tsLoadMap();
-                        const idx = cur.findIndex(e => e.part === r.part);
-                        if (idx >= 0) { cur.splice(idx, 1); tsSaveMap(cur); }
-                        row.style.opacity = '1';
-                        ckBtn.remove(); rmBtn.remove();
-                        actCell.appendChild(addBtn2());
-                        tsRenderSaved(savedList);
-                        tsToast(`🗑️ "${r.part}" entfernt`);
-                    };
-                    actCell.appendChild(cpBtn); actCell.appendChild(ckBtn); actCell.appendChild(rmBtn);
-                } else {
-                    actCell.appendChild(cpBtn);
-                    actCell.appendChild(addBtn2());
-                }
-
-                function addBtn2() {
-                    const ab = tsMk('button', 'width:26px;height:26px;background:#15803d;border:1px solid #22c55e;border-radius:4px;color:white;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .15s;');
-                    ab.textContent = '+'; ab.title = 'Speichern';
-                    ab.onmouseover = () => ab.style.background = '#16a34a';
-                    ab.onmouseout  = () => ab.style.background = '#15803d';
-                    ab.onclick = () => {
-                        const alias = (prompt(`Alias für "${r.part}":\n(leer = Partnummer als Key)`, r.part.toLowerCase()) ?? '').trim();
-                        const key = alias || r.part.toLowerCase();
-                        const cur = tsLoadMap();
-                        if (!cur.some(e => e.part === r.part)) { cur.push({ key, part: r.part, desc: r.desc, uom: r.uom }); tsSaveMap(cur); }
-                        row.style.opacity = '.55';
-                        ab.remove();
-                        const ck = tsMk('button', 'width:26px;height:26px;background:#1a2030;border:1px solid #2a3040;border-radius:4px;color:#22c55e;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:default;');
-                        ck.textContent = '✓';
-                        const rm = tsMk('button', 'width:26px;height:26px;background:#7f1d1d;border:1px solid #ef4444;border-radius:4px;color:#fca5a5;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;');
-                        rm.textContent = '−'; rm.title = 'Entfernen';
-                        rm.onclick = () => {
-                            const cur2 = tsLoadMap();
-                            const idx = cur2.findIndex(e => e.part === r.part);
-                            if (idx >= 0) { cur2.splice(idx, 1); tsSaveMap(cur2); }
-                            row.style.opacity = '1'; ck.remove(); rm.remove(); actCell.appendChild(addBtn2());
-                            tsRenderSaved(savedList);
-                            tsToast(`🗑️ "${r.part}" entfernt`);
-                        };
-                        actCell.appendChild(ck); actCell.appendChild(rm);
-                        tsRenderSaved(savedList);
-                        tsToast(`✅ "${r.part}" gespeichert als "${key}"`);
-                    };
-                    return ab;
-                }
-
-                [imgCell, partCell, descCell, bestandCell, uomCell, lortCell, actCell].forEach(c => row.appendChild(c));
-                results.appendChild(row);
-            });
+            const body = document.getElementById('apmgod-ts-body');
+            if (body) body.innerHTML = '<div style="padding:16px 14px;color:var(--apm-text-muted,#64748b);font-size:var(--apm-text-sm,12px);font-style:italic;">⏳ Suche läuft…</div>';
+            const dataspyId = popup.querySelector('#apmgod-ts-dataspy')?.value || '101496';
+            const results = await tsSearch(pq, dq, dataspyId);
+            tsRebuildGrid(results);
         }
 
-        goBtn.onclick = doSearch;
-        [pInp, dInp, mInp].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); }));
+        // Initial render (saved parts only)
+        tsRebuildGrid();
         setTimeout(() => pInp.focus(), 80);
     }
 
-    // ALT+5 — Teilesuche öffnen/schließen
+    // ALT+5 toggle
     document.addEventListener('keydown', function(e) {
         if (e.altKey && e.key === '5') {
             e.preventDefault();
-            const existing = document.getElementById('apmgod-teile-panel');
-            if (existing) existing.remove();
-            else showTeilesuche();
+            const ex = document.getElementById('apmgod-teile-panel');
+            if (ex) ex.remove(); else showTeilesuche();
         }
     });
 
-    // Inject Teilesuche trigger button in EAM top bar
-    (function injectTeileBtn() {
-        const observer = new MutationObserver(() => {
-            if (document.getElementById('apmgod-teile-trigger')) return;
-            const toolbar = document.querySelector('.x-toolbar-default, .x-toolfooter, [class*="toolbar"]');
-            if (!toolbar) return;
-            const btn = document.createElement('button');
-            btn.id = 'apmgod-teile-trigger';
-            btn.textContent = '🔍 Teilesuche';
-            btn.style.cssText = 'position:fixed;top:10px;right:180px;z-index:9997;background:#1d4ed8;border:none;border-radius:5px;color:#fff;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s;';
-            btn.onmouseover = () => btn.style.background = '#1e40af';
-            btn.onmouseout  = () => btn.style.background = '#1d4ed8';
-            btn.onclick = () => {
-                const ex = document.getElementById('apmgod-teile-panel');
-                if (ex) ex.remove(); else showTeilesuche();
-            };
-            document.body.appendChild(btn);
-            observer.disconnect();
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+    // Inject trigger button (fixed, top-right area)
+    (function() {
+        if (document.getElementById('apmgod-teile-trigger')) return;
+        const btn = document.createElement('button');
+        btn.id = 'apmgod-teile-trigger';
+        btn.className = 'apm-btn apm-btn--neutral';
+        btn.style.cssText = 'position:fixed;top:8px;right:160px;z-index:9997;height:28px;padding:0 12px;font-size:var(--apm-text-sm,12px);font-weight:600;cursor:pointer;border-radius:var(--apm-radius-sm,4px);border:1px solid var(--apm-border,#2a3447);background:var(--apm-surface-inset,#151b27);color:var(--apm-text-primary,#c8d4e8);display:flex;align-items:center;gap:6px;transition:all .15s;';
+        btn.innerHTML = `${TS_SVG_COPY} Teilesuche`;
+        btn.title = 'Teilesuche öffnen (ALT+5)';
+        btn.onmouseover = () => { btn.style.borderColor='var(--apm-accent,#3b82f6)'; btn.style.color='var(--apm-accent,#3b82f6)'; };
+        btn.onmouseout  = () => { btn.style.borderColor='var(--apm-border,#2a3447)'; btn.style.color='var(--apm-text-primary,#c8d4e8)'; };
+        btn.onclick = () => { const ex = document.getElementById('apmgod-teile-panel'); if (ex) ex.remove(); else showTeilesuche(); };
+        document.body.appendChild(btn);
     })();
+
 
 })();
