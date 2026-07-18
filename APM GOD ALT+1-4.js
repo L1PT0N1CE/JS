@@ -890,63 +890,90 @@
         try { localStorage.setItem(TS_KEY, JSON.stringify(m)); } catch(e) {} }
 
     function tsGetSession() {
+        // 1. URL params (works in loadmain iframes)
         try { const p = new URLSearchParams(window.location.search), e = p.get('eamid'), t = p.get('tenant'); if (e) return {eamid:e,tenant:t||'AMAZONRMEEU_PRD'}; } catch(_){}
+        // 2. iframe[src*=eamid] check (COMMON page hat EAM iframes)
         try { const top = window !== window.top ? window.top : window, f = top.document.querySelector('iframe[src*="eamid="]'); if (f) { const p2 = new URL(f.src).searchParams, e = p2.get('eamid'); if (e) return {eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'}; } } catch(_){}
-        try { const cat = window.APMApi?.get?.('partsCatalog'); if (cat?.getImageUrl) { const url = cat.getImageUrl('x')||''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return {eamid:m[1],tenant:'AMAZONRMEEU_PRD'}; } } catch(_){}
+        // 3. EAM.SessionStorage (zuverlässigste Methode auf COMMON page)
+        try { for (const w of [window, unsafeWindow, window.top]) { const ss = w?.EAM?.SessionStorage; if (ss?.eamid) return {eamid:ss.eamid,tenant:ss.tenant||'AMAZONRMEEU_PRD'}; } } catch(_){}
+        // 4. APMApi partsCatalog getImageUrl (hat eamid in URL)
+        try { const cat = (unsafeWindow||window).APMApi?.get?.('partsCatalog'); if (cat?.getImageUrl) { const url = cat.getImageUrl('x')||''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return {eamid:m[1],tenant:'AMAZONRMEEU_PRD'}; } } catch(_){}
+        // 5. gAppData initparams (EAM setzt das nach SAML-Redirect)
+        try { const g = (unsafeWindow||window).top?.gAppData?.initparams; if (g?.eamid) return {eamid:g.eamid,tenant:g.tenant||'AMAZONRMEEU_PRD'}; } catch(_){}
         return null;
     }
 
-    async function tsSearch(partcode, description, dataspyId) {
+    // GM fetch wrapper — wie APM Master: bypasses TM-Sandbox CORS mit GM_xmlhttpRequest
+    function tsGmFetch(url, params) {
+        return new Promise((resolve, reject) => {
+            if (typeof GM_xmlhttpRequest === 'undefined') {
+                // fallback auf normales fetch (z.B. wenn @grant fehlt)
+                fetch(url, {method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams(params).toString()})
+                    .then(r => r.text()).then(resolve).catch(reject);
+                return;
+            }
+            GM_xmlhttpRequest({
+                method: 'POST', url,
+                headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
+                data: new URLSearchParams(params).toString(),
+                withCredentials: true,
+                onload:    r => resolve(r.responseText),
+                onerror:   () => reject(new Error('GM_xhr error')),
+                ontimeout: () => reject(new Error('GM_xhr timeout')),
+                timeout:   15000
+            });
+        });
+    }
+
+    async function tsSearch(partcode, description, mfr, dataspyId) {
+        const pq = (partcode||'').trim(), dq = (description||'').trim(), mq = (mfr||'').trim();
+        if (!pq && !dq && !mq) return [];
+
+        // Primär: APMApi.searchCatalog — kein CORS, kein Session-Gebastel
+        try {
+            const cat = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window)?.APMApi?.get?.('partsCatalog');
+            if (cat?.searchCatalog) {
+                const res = await cat.searchCatalog(
+                    {partcode: pq, description: dq, mfr: mq},
+                    {limit: 50, dataspyId: dataspyId || '101496'}
+                );
+                return (res.records || []).map(row => ({
+                    part:     row.partcode    || '',
+                    desc:     row.description || '',
+                    uom:      row.uom         || '',
+                    bestand:  '',
+                    lager:    '',
+                    lagerort: '',
+                    pic:      row.profilepicture || '',
+                })).filter(r => r.part);
+            }
+        } catch(e) { console.warn('[Teilesuche] searchCatalog:', e.message); }
+
+        // Fallback: direkte SSPART.xmlhttp (wenn APMApi fehlt)
         const s = tsGetSession();
-        if (!s) return [];
-        const pq = (partcode||'').trim(), dq = (description||'').trim();
-        if (!pq && !dq) return [];
+        if (!s) { console.warn('[Teilesuche] Session nicht gefunden'); return []; }
         const params = {
             GRID_NAME:'SSPART', USER_FUNCTION_NAME:'SSPART', SYSTEM_FUNCTION_NAME:'SSPART',
             CURRENT_TAB_NAME:'LST', COMPONENT_INFO_TYPE:'DATA_ONLY', FORCE_REQUERY:'YES', MAX_ROWS:'50',
-            DATASPY_ID: dataspyId || '101496', GRID_ID:'80',
-            eamid: s.eamid, tenant: s.tenant,
+            DATASPY_ID: dataspyId || '101496', GRID_ID:'80', eamid: s.eamid, tenant: s.tenant,
         };
         let seq = 1;
         if (pq) { params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='partcode'; params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS'; params[`MADDON_FILTER_VALUE_${seq}`]=pq; params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq); params[`MADDON_FILTER_JOINER_${seq}`]='AND'; params[`MADDON_LPAREN_${seq}`]='false'; params[`MADDON_RPAREN_${seq}`]='false'; seq++; }
         if (dq) { params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description'; params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS'; params[`MADDON_FILTER_VALUE_${seq}`]=dq; params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq); params[`MADDON_FILTER_JOINER_${seq}`]='AND'; params[`MADDON_LPAREN_${seq}`]='false'; params[`MADDON_RPAREN_${seq}`]='false'; seq++; }
         try {
-            const r = await fetch('https://eu1.eam.hxgnsmartcloud.com/web/base/SSPART.xmlhttp', {
-                method:'POST', credentials:'include',
-                headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
-                body: new URLSearchParams(params).toString()
-            });
-            const json = JSON.parse(await r.text());
+            const text = await tsGmFetch('https://eu1.eam.hxgnsmartcloud.com/web/base/SSPART.xmlhttp', params);
+            const json = JSON.parse(text);
             const rows = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA || [];
             const seen = new Set();
-            return rows.filter(row => { const p = row.partcode||''; if (!p||seen.has(p)) return false; seen.add(p); return true; }).map(row => ({
-                part:     row.partcode         || '',
-                desc:     row.description      || row.partdescription || '',
-                uom:      row.uom              || '',
-                bestand:  row.qty              || row.balance         || row.stockbalance || '',
-                lager:    row.numberOfStores   || row.storecount      || '',
-                lagerort: row.bin              || row.storelocation   || row.location     || '',
-                pic:      row.profilepicture   || '',
-                eamid:    s.eamid,
-            })).filter(r => r.part);
+            return rows.filter(row => { const p=row.partcode||''; if(!p||seen.has(p)) return false; seen.add(p); return true; })
+                .map(row => ({
+                    part: row.partcode||'', desc: row.description||row.partdescription||'',
+                    uom: row.uom||'', bestand: row.qty||row.balance||'',
+                    lager: row.numberOfStores||'', lagerort: row.bin||row.storelocation||'',
+                    pic: row.profilepicture||'',
+                })).filter(r => r.part);
         } catch(e) { console.warn('[Teilesuche]', e.message); return []; }
     }
-
-    function tsToast(msg) {
-        const t = document.createElement('div');
-        t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:var(--apm-surface-0,#1a2332);border:1px solid var(--apm-border,#2a3447);color:var(--apm-text-primary,#c8d4e8);padding:9px 20px;border-radius:6px;font-size:13px;z-index:2000000;box-shadow:0 4px 16px rgba(0,0,0,.5);white-space:nowrap;pointer-events:none;font-family:inherit;';
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(() => t.remove(), 320); }, 2000);
-    }
-
-    // SVG icons (matching APM Master)
-    const TS_SVG_CARET   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
-    const TS_SVG_CLOSE   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    const TS_SVG_COPY    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-    const TS_SVG_PLUS    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-    const TS_SVG_CHECK   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    const TS_SVG_REMOVE  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`;
 
     // Fallback CSS for when APM Master isn't loaded (uses same var names with hardcoded fallbacks)
     function tsInjectFallbackCSS() {
@@ -1078,7 +1105,10 @@
             secLbl.textContent = searchResults.length > 0 ? `Suchergebnisse (${searchResults.length})` : '';
             if (searchResults.length === 0) {
                 secLbl.className = 'apm-pb-empty';
-                secLbl.textContent = 'Keine Treffer — Parts in my Stores · FRA7';
+                const dsEl = document.getElementById('apmgod-ts-dataspy');
+                const dsLabel = dsEl?.selectedOptions?.[0]?.textContent || 'Parts';
+                const site = document.getElementById('apmgod-ts-site')?.value || 'FRA7';
+                secLbl.textContent = `Keine Treffer — ${dsLabel} · ${site}`;
             }
             grid.appendChild(secLbl);
 
@@ -1087,6 +1117,7 @@
                 searchResults.forEach(r => {
                     const isSaved = saved.some(e => e.part === r.part);
                     const row = tsEl('div', 'apm-pb-row');
+                    row.dataset.part = r.part;
                     if (isSaved) row.style.opacity = '.55';
                     row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
                     row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
@@ -1237,6 +1268,30 @@
         body.appendChild(grid);
     }
 
+    // Lazy stock enrichment — lädt Bestand+Lagerort nach Render
+    async function tsEnrichStock(results, gridEl) {
+        try {
+            const cat = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window)?.APMApi?.get?.('partsCatalog');
+            if (!cat?.fetchPartStock) return;
+            for (const r of results) {
+                try {
+                    const s = await cat.fetchPartStock(r.part, {site: 'FRA7'});
+                    const row = gridEl?.querySelector('[data-part="' + r.part + '"]');
+                    if (!row || !s) continue;
+                    const qty    = s?.summary?.totalQty;
+                    const bin    = s?.summary?.primaryBin || s?.bins?.[0]?.bin || '';
+                    const stores = s?.summary?.storeCount;
+                    const cell_b = row.querySelector('.apm-pb-cell-instock');
+                    const cell_s = row.querySelector('.apm-pb-cell-stores');
+                    const cell_l = row.querySelector('.apm-ps-loc-text');
+                    if (cell_b && qty != null) cell_b.textContent = qty === 0 ? '0' : String(qty);
+                    if (cell_s && stores != null) cell_s.textContent = String(stores);
+                    if (cell_l && bin) cell_l.textContent = bin;
+                } catch(_) {}
+            }
+        } catch(_) {}
+    }
+
     function showTeilesuche() {
         if (document.getElementById('apmgod-teile-panel')) return;
         tsInjectFallbackCSS();
@@ -1261,8 +1316,9 @@
                     <select id="apmgod-ts-dataspy" class="apm-pb-dataspy-select" title="Katalogbereich">
                         <option value="82">All Parts</option>
                         <option value="100455">Parts in Service</option>
-                        <option value="101496" selected>Parts in my Stores</option>
+                        <option value="82" selected>All Parts</option>
                     </select>
+                    <button type="button" class="apm-pb-close" id="apmgod-ts-pin" title="Panel andocken (Floating / Oben / Unten)" style="margin-right:2px;font-size:14px;">📌</button>
                     <button type="button" class="apm-pb-close" id="apmgod-ts-close" title="Schließen">×</button>
                 </div>
             </div>
@@ -1303,6 +1359,69 @@
         // Close
         popup.querySelector('#apmgod-ts-close').onclick = () => popup.remove();
 
+        // Anchor cycling: floating → top → bottom
+        const TS_ANCHOR_KEY = 'apmgod-teile-anchor';
+        const pinBtn = popup.querySelector('#apmgod-ts-pin');
+        const anchors = ['floating','top','bottom'];
+        const pinIcons = {'floating':'📌','top':'⬆️','bottom':'⬇️'};
+        const pinTitles = {'floating':'Floating (ziehbar)','top':'Oben angedockt','bottom':'Unten angedockt'};
+
+        function applyAnchor(mode) {
+            localStorage.setItem(TS_ANCHOR_KEY, mode);
+            pinBtn.textContent = pinIcons[mode];
+            pinBtn.title = pinTitles[mode];
+            popup.style.transition = 'top .2s, bottom .2s';
+            if (mode === 'top') {
+                popup.style.position = 'fixed';
+                popup.style.top = '0px';
+                popup.style.bottom = '';
+                popup.style.left = '0px';
+                popup.style.right = '0px';
+                popup.style.transform = 'none';
+                popup.style.width = '100%';
+                popup.style.maxWidth = '100%';
+                popup.style.borderRadius = '0 0 6px 6px';
+            } else if (mode === 'bottom') {
+                popup.style.position = 'fixed';
+                popup.style.bottom = '0px';
+                popup.style.top = '';
+                popup.style.left = '0px';
+                popup.style.right = '0px';
+                popup.style.transform = 'none';
+                popup.style.width = '100%';
+                popup.style.maxWidth = '100%';
+                popup.style.borderRadius = '6px 6px 0 0';
+            } else {
+                // restore floating
+                popup.style.width = '';
+                popup.style.maxWidth = '';
+                popup.style.borderRadius = '';
+                popup.style.bottom = '';
+                popup.style.right = '';
+                try {
+                    const pos = JSON.parse(localStorage.getItem('apmgod-teile-pos') || 'null');
+                    if (pos) { popup.style.left = pos.left; popup.style.top = pos.top; popup.style.transform = 'none'; }
+                    else { popup.style.left = '50%'; popup.style.top = '60px'; popup.style.transform = 'translateX(-50%)'; }
+                } catch(_) { popup.style.left = '50%'; popup.style.top = '60px'; popup.style.transform = 'translateX(-50%)'; }
+            }
+        }
+
+        // Restore saved anchor
+        const savedAnchor = localStorage.getItem(TS_ANCHOR_KEY) || 'floating';
+        applyAnchor(savedAnchor);
+
+        pinBtn.onclick = () => {
+            const cur = localStorage.getItem(TS_ANCHOR_KEY) || 'floating';
+            const next = anchors[(anchors.indexOf(cur) + 1) % anchors.length];
+            applyAnchor(next);
+        };
+
+        // Disable drag when anchored
+        hdr.addEventListener('mousedown', e => {
+            if (e.target.closest('.apm-pb-close, select, button')) return;
+            if ((localStorage.getItem(TS_ANCHOR_KEY) || 'floating') !== 'floating') return;
+        }, true);
+
         // Search inputs
         const pInp = popup.querySelector('#apmgod-ts-part');
         const dInp = popup.querySelector('#apmgod-ts-desc');
@@ -1331,8 +1450,12 @@
             const body = document.getElementById('apmgod-ts-body');
             if (body) body.innerHTML = '<div style="padding:16px 14px;color:var(--apm-text-muted,#64748b);font-size:var(--apm-text-sm,12px);font-style:italic;">⏳ Suche läuft…</div>';
             const dataspyId = popup.querySelector('#apmgod-ts-dataspy')?.value || '101496';
-            const results = await tsSearch(pq, dq, dataspyId);
+            const mq = mInp.value.trim();
+            const results = await tsSearch(pq, dq, mq, dataspyId);
             tsRebuildGrid(results);
+            // lazy stock enrichment nach dem render
+            const grid = document.getElementById('apmgod-ts-grid');
+            if (grid && results.length) tsEnrichStock(results, grid);
         }
 
         // Initial render (saved parts only)
