@@ -90,8 +90,7 @@
 
     function getEamStats() {
         try {
-            const _ExtQ = (typeof unsafeWindow !== 'undefined' ? unsafeWindow.Ext : null) || (typeof Ext !== 'undefined' ? Ext : null);
-        if (_ExtQ && _ExtQ.ComponentQuery) {
+            if (typeof Ext !== 'undefined' && Ext.ComponentQuery) {
                 const comps = Ext.ComponentQuery.query('[name="hrswork"]');
                 if (comps && comps.length > 0) {
                     const val = comps[comps.length - 1].getValue();
@@ -158,46 +157,6 @@
         return agSelectedHours;
     }
 
-    function clickEamBookButton() {
-        // EAM toolbar save/book is the green save icon — uft-id-save is the standard EAM save action
-        // Try all known uft-id patterns for this button
-        const uftCandidates = ['save', 'book', 'booklabor', 'add', 'accept'];
-        for (const id of uftCandidates) {
-            const el = document.querySelector(`a.uft-id-${id}`);
-            if (el && el.offsetParent !== null && !el.closest('.x-item-disabled')) {
-                el.click();
-                console.log('[APM-GOD] Book via uft-id-' + id);
-                return true;
-            }
-        }
-
-        // ExtJS: find the first enabled toolbar button (save icon has no text, just icon class)
-        // unsafeWindow.Ext because TM sandbox hides Ext from plain window
-        const _Ext = (typeof unsafeWindow !== 'undefined' ? unsafeWindow.Ext : null) || (typeof Ext !== 'undefined' ? Ext : null);
-        if (_Ext && _Ext.ComponentQuery) {
-            const toolbars = _Ext.ComponentQuery.query('toolbar');
-            for (const tb of toolbars) {
-                if (!tb.isVisible || !tb.isVisible()) continue;
-                const btns = tb.query('button');
-                for (const btn of btns) {
-                    const icon  = (btn.iconCls  || '').toLowerCase();
-                    const iid   = (btn.itemId   || '').toLowerCase();
-                    const tt    = (btn.tooltip  || '').toLowerCase();
-                    const txt   = (btn.text     || '').toLowerCase();
-                    if ((icon + iid + tt + txt).match(/save|book|accept|add/) && !btn.isDisabled()) {
-                        btn.el ? btn.el.dom.click() : btn.fireEvent('click', btn);
-                        console.log('[APM-GOD] Book via ExtJS btn', btn.itemId || btn.iconCls);
-                        return true;
-                    }
-                }
-            }
-        }
-
-        console.warn('[APM-GOD] EAM Book-Button nicht gefunden — alle a[class*=uft-id]:');
-        document.querySelectorAll('a[class*="uft-id"]').forEach(a => console.log(a.className));
-        return false;
-    }
-
     function submitForm() {
         const panel = document.getElementById('apmgod-panel');
         if (!panel) return;
@@ -224,9 +183,6 @@
         }
 
         panel.remove();
-
-        // Give EAM 150ms to register field values, then click Book
-        setTimeout(clickEamBookButton, 150);
     }
 
     function showModalDialog() {
@@ -298,17 +254,6 @@
         `;
         document.body.appendChild(panel);
 
-        // Restore saved panel position (remember last drag position)
-        const savedPos = localStorage.getItem('apmgod-panel-pos');
-        if (savedPos) {
-            try {
-                const pos = JSON.parse(savedPos);
-                panel.style.left  = pos.left;
-                panel.style.top   = pos.top;
-                panel.style.right = 'auto';
-            } catch (e) {}
-        }
-
         // Apply correct initial octype toggle state
         const btnNormal   = panel.querySelector('#ag-btn-normal');
         const btnOvertime = panel.querySelector('#ag-btn-overtime');
@@ -331,32 +276,10 @@
             panel.style.top   = (e.clientY - oy) + 'px';
             panel.style.right = 'auto';
         });
-        document.addEventListener('mouseup', () => {
-            if (dragging) {
-                const r = panel.getBoundingClientRect();
-                localStorage.setItem('apmgod-panel-pos', JSON.stringify({
-                    left: r.left + 'px',
-                    top:  r.top  + 'px'
-                }));
-            }
-            dragging = false;
-        });
-
-        // Enter key anywhere while panel is open = submit (capture phase so EAM can't block it)
-        const agEnterHandler = e => {
-            if ((e.key === 'Enter' || e.which === 13) && document.getElementById('apmgod-panel')) {
-                e.preventDefault();
-                e.stopPropagation();
-                submitForm();
-            }
-        };
-        document.addEventListener('keydown', agEnterHandler, true);
+        document.addEventListener('mouseup', () => { dragging = false; });
 
         // Close
-        panel.querySelector('.ag-close').onclick = () => {
-            document.removeEventListener('keydown', agEnterHandler, true);
-            panel.remove();
-        };
+        panel.querySelector('.ag-close').onclick = () => panel.remove();
 
         // Preset buttons: click = select, dblclick = select + book
         panel.querySelectorAll('.ag-preset-btn').forEach(btn => {
@@ -764,11 +687,15 @@
     // SECTION 5: Key Listeners ALT+4
     // ─────────────────────────────────────────────
 
-    document.addEventListener('keydown', function (event) {
-        if (event.altKey && event.key === '4') {
+    $(document).keydown(function (event) {
+        if (event.altKey && event.which === 52) {
             event.preventDefault();
-            if (!document.getElementById('apmgod-panel')) showModalDialog();
+            if ($("#apmgod-panel").length === 0) showModalDialog();
             fillTimeFunction();
+        }
+        if (event.which === 13 && $("#apmgod-panel").length > 0) {
+            event.preventDefault();
+            submitForm();
         }
     });
 
@@ -874,452 +801,5 @@
     });
 
     console.log('[EAM AutoConfirm] Script aktiv – überwacht auf Date-Worked-Dialog (EN + DE).');
-
-    // ─────────────────────────────────────────────
-    // SECTION 8: Teilesuche ALT+5
-    // ─────────────────────────────────────────────
-
-    const TS_KEY = 'partcodeMap_v3';
-    function tsLoad() { try { return JSON.parse(localStorage.getItem(TS_KEY)) || []; } catch(e) { return []; } }
-    function tsSave(m) { try { localStorage.setItem(TS_KEY, JSON.stringify(m)); } catch(e) {} }
-
-    // SVG icons (inline)
-    const I_COPY   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-    const I_PLUS   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-    const I_CHECK  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="20 6 9 17 4 12"/></svg>`;
-    const I_TRASH  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
-
-    // Colors (dark theme, standalone — kein APM Master nötig)
-    const C = {
-        bg0:     '#151c2a', bg1: '#1a2235', bg2: '#202b40', bg3: '#252f42',
-        border:  '#2a3447', borderHover: '#3b4d6b',
-        text:    '#c8d4e8', muted: '#64748b', dim: '#475569',
-        accent:  '#3b82f6', accentHover: '#2563eb',
-        danger:  '#ef4444', green: '#22c55e',
-        shadow:  '0 8px 32px rgba(0,0,0,.6)',
-    };
-
-    function tsStyle(el, props) { Object.assign(el.style, props); return el; }
-    function tsEl(tag, props) {
-        const el = document.createElement(tag);
-        if (props) Object.assign(el.style, props);
-        return el;
-    }
-
-    function tsToast(msg) {
-        const t = tsEl('div', {position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',
-            background:C.bg1,border:`1px solid ${C.border}`,color:C.text,padding:'8px 18px',
-            borderRadius:'6px',fontSize:'13px',zIndex:'2000001',boxShadow:C.shadow,
-            whiteSpace:'nowrap',pointerEvents:'none',fontFamily:'inherit'});
-        t.textContent = msg;
-        document.body.appendChild(t);
-        setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(() => t.remove(), 320); }, 2000);
-    }
-
-    function tsActionBtn(icon, title) {
-        const b = tsEl('button', {background:'transparent',border:'none',cursor:'pointer',
-            color:C.muted,padding:'3px',borderRadius:'4px',display:'flex',alignItems:'center',
-            transition:'color .15s',flexShrink:'0'});
-        b.type = 'button'; b.title = title; b.innerHTML = icon;
-        b.addEventListener('mouseenter', () => b.style.color = C.text);
-        b.addEventListener('mouseleave', () => b.style.color = C.muted);
-        return b;
-    }
-
-    // APMApi shortcut
-    function tsAPM() {
-        try { return (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window).APMApi?.get?.('partsCatalog'); } catch(_) { return null; }
-    }
-
-    function tsGetSession() {
-        try { const p = new URLSearchParams(window.location.search), e = p.get('eamid'), t = p.get('tenant'); if (e) return {eamid:e,tenant:t||'AMAZONRMEEU_PRD'}; } catch(_){}
-        try { const f = (window !== window.top ? window.top : window).document.querySelector('iframe[src*="eamid="]'); if (f) { const p2 = new URL(f.src).searchParams, e = p2.get('eamid'); if (e) return {eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'}; } } catch(_){}
-        try { for (const w of [window, unsafeWindow, window.top]) { const ss = w?.EAM?.SessionStorage; if (ss?.eamid) return {eamid:ss.eamid,tenant:ss.tenant||'AMAZONRMEEU_PRD'}; } } catch(_){}
-        try { const cat = (unsafeWindow||window).APMApi?.get?.('partsCatalog'); if (cat?.getImageUrl) { const url = cat.getImageUrl('x')||''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return {eamid:m[1],tenant:'AMAZONRMEEU_PRD'}; } } catch(_){}
-        try { const g = (unsafeWindow||window).top?.gAppData?.initparams; if (g?.eamid) return {eamid:g.eamid,tenant:g.tenant||'AMAZONRMEEU_PRD'}; } catch(_){}
-        return null;
-    }
-
-    function tsGmFetch(url, params) {
-        return new Promise((resolve, reject) => {
-            if (typeof GM_xmlhttpRequest === 'undefined') {
-                fetch(url, {method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams(params).toString()})
-                    .then(r => r.text()).then(resolve).catch(reject);
-                return;
-            }
-            GM_xmlhttpRequest({method:'POST',url,headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
-                data:new URLSearchParams(params).toString(),withCredentials:true,
-                onload:r=>resolve(r.responseText),onerror:()=>reject(new Error('GM_xhr')),
-                ontimeout:()=>reject(new Error('timeout')),timeout:15000});
-        });
-    }
-
-    async function tsSearch(partcode, description, mfr, dataspyId) {
-        const pq=(partcode||'').trim(), dq=(description||'').trim(), mq=(mfr||'').trim();
-        if (!pq && !dq && !mq) return [];
-        // Primär: APMApi (kein CORS, kein Session-Problem)
-        try {
-            const cat = tsAPM();
-            if (cat?.searchCatalog) {
-                const res = await cat.searchCatalog({partcode:pq,description:dq,mfr:mq},{limit:50,dataspyId:dataspyId||'101496'});
-                return (res.records||[]).map(r=>({part:r.partcode||'',desc:r.description||'',uom:r.uom||'',pic:r.profilepicture||'',bestand:'',lager:'',lagerort:''})).filter(r=>r.part);
-            }
-        } catch(e) { console.warn('[TS] APMApi:', e.message); }
-        // Fallback: SSPART.xmlhttp
-        const s = tsGetSession();
-        if (!s) { console.warn('[TS] keine session'); return []; }
-        const params = {GRID_NAME:'SSPART',USER_FUNCTION_NAME:'SSPART',SYSTEM_FUNCTION_NAME:'SSPART',
-            CURRENT_TAB_NAME:'LST',COMPONENT_INFO_TYPE:'DATA_ONLY',FORCE_REQUERY:'YES',MAX_ROWS:'50',
-            DATASPY_ID:dataspyId||'101496',GRID_ID:'80',eamid:s.eamid,tenant:s.tenant};
-        let seq=1;
-        if(pq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='partcode';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=pq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
-        if(dq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=dq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
-        try {
-            const text = await tsGmFetch('https://eu1.eam.hxgnsmartcloud.com/web/base/SSPART.xmlhttp', params);
-            const json = JSON.parse(text);
-            const rows = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA||[];
-            const seen = new Set();
-            return rows.filter(r=>{const p=r.partcode||'';if(!p||seen.has(p))return false;seen.add(p);return true;})
-                .map(r=>({part:r.partcode||'',desc:r.description||r.partdescription||'',uom:r.uom||'',
-                    bestand:r.qty||r.balance||'',lager:r.numberOfStores||'',lagerort:r.bin||r.storelocation||'',pic:r.profilepicture||''})).filter(r=>r.part);
-        } catch(e) { console.warn('[TS]', e.message); return []; }
-    }
-
-    async function tsEnrichStock(results, gridEl) {
-        try {
-            const cat = tsAPM();
-            if (!cat?.fetchPartStock) return;
-            for (const r of results) {
-                try {
-                    const s = await cat.fetchPartStock(r.part, {site:'FRA7'});
-                    const row = gridEl?.querySelector(`[data-part="${r.part}"]`);
-                    if (!row || !s) continue;
-                    const qty=s?.summary?.totalQty, bin=s?.summary?.primaryBin||s?.bins?.[0]?.bin||'', stores=s?.summary?.storeCount;
-                    const cb=row.querySelector('.ts-cell-bestand'), cs=row.querySelector('.ts-cell-lager'), cl=row.querySelector('.ts-cell-lagerort');
-                    if(cb&&qty!=null)cb.textContent=String(qty);
-                    if(cs&&stores!=null)cs.textContent=String(stores);
-                    if(cl&&bin)cl.textContent=bin;
-                } catch(_){}
-            }
-        } catch(_){}
-    }
-
-    function tsBuildGrid(results, saved) {
-        const wrap = tsEl('div', {flex:'1',overflowY:'auto',overflowX:'auto'});
-
-        if (results === null) {
-            // initial state — keine suche
-            const intro = tsEl('div', {padding:'32px 20px',color:C.muted,fontSize:'13px',textAlign:'center'});
-            intro.textContent = 'Teile-Nr. oder Beschreibung eingeben…';
-            wrap.appendChild(intro);
-        } else if (results.length === 0) {
-            const empty = tsEl('div', {padding:'32px 20px',color:C.muted,fontSize:'13px',textAlign:'center'});
-            empty.textContent = 'Keine Treffer';
-            wrap.appendChild(empty);
-        } else {
-            // Grid
-            const cols = '44px minmax(100px,0.8fr) minmax(200px,2fr) 60px 52px 52px minmax(80px,1fr) 80px';
-            const grid = tsEl('div', {display:'grid',gridTemplateColumns:cols,width:'100%',minWidth:'700px'});
-
-            // Header row
-            const hdr = tsEl('div', {display:'contents'});
-            for (const [lbl,cls] of [['Bild',''],['Teil',''],['Beschreibung',''],['Bestand','ts-cell-bestand'],['Lager',''],['UOM',''],['Lagerort',''],['','']] ) {
-                const th = tsEl('div', {padding:'6px 8px',fontSize:'11px',color:C.muted,borderBottom:`1px solid ${C.border}`,fontWeight:'600',letterSpacing:'.04em',textTransform:'uppercase',position:'sticky',top:'0',background:C.bg1,zIndex:'1'});
-                th.textContent = lbl;
-                grid.appendChild(th);
-            }
-
-            for (const r of results) {
-                const isSaved = saved.some(e => e.part === r.part);
-                const row = tsEl('div', {display:'contents'});
-                row.dataset = {};
-
-                const cells = [];
-                const mkCell = (cls='') => {
-                    const c = tsEl('div', {padding:'7px 8px',fontSize:'12px',color:C.text,borderBottom:`1px solid rgba(42,52,71,.6)`,display:'flex',alignItems:'center',background:isSaved?'rgba(59,130,246,.04)':'transparent'});
-                    if(cls) c.className = cls;
-                    cells.push(c);
-                    return c;
-                };
-
-                // Image
-                const imgC = mkCell();
-                if (r.pic) {
-                    const img = document.createElement('img');
-                    img.style.cssText = 'width:36px;height:36px;object-fit:contain;border-radius:4px;background:#0f1621;';
-                    img.onerror = () => { img.style.display='none'; };
-                    const s = tsGetSession();
-                    img.src = s ? `https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${s.eamid}&tenant=AMAZONRMEEU_PRD` : '';
-                    imgC.appendChild(img);
-                }
-
-                // Part number
-                const partC = mkCell();
-                const link = document.createElement('a');
-                link.href = `https://eu1.eam.hxgnsmartcloud.com/web/base/logindisp?tenant=AMAZONRMEEU_PRD&SYSTEM_FUNCTION_NAME=SSPART&USER_FUNCTION_NAME=SSPART&DRILLBACK=YES&partcode=${encodeURIComponent(r.part)}`;
-                link.target = '_blank';
-                link.textContent = r.part;
-                link.style.cssText = `color:${C.accent};text-decoration:none;font-family:monospace;font-size:12px;font-weight:600;`;
-                link.addEventListener('mouseenter', ()=>link.style.textDecoration='underline');
-                link.addEventListener('mouseleave', ()=>link.style.textDecoration='none');
-                const cpPart = tsActionBtn(I_COPY, 'Kopieren');
-                cpPart.style.marginLeft = '4px';
-                cpPart.onclick = () => { navigator.clipboard.writeText(r.part); tsToast(`📋 ${r.part} kopiert`); };
-                partC.appendChild(link); partC.appendChild(cpPart);
-
-                // Desc
-                const descC = mkCell();
-                descC.textContent = r.desc;
-                descC.style.color = C.muted;
-
-                // Bestand / Lager / UOM / Lagerort
-                const bestandC = mkCell('ts-cell-bestand'); bestandC.textContent = r.bestand || '…';
-                bestandC.style.color = C.muted; bestandC.style.justifyContent = 'center';
-                const lagerC = mkCell('ts-cell-lager'); lagerC.textContent = r.lager || '…';
-                lagerC.style.color = C.muted; lagerC.style.justifyContent = 'center';
-                const uomC = mkCell(); uomC.textContent = r.uom || '—';
-                uomC.style.color = C.dim; uomC.style.justifyContent = 'center';
-                const lagerortC = mkCell('ts-cell-lagerort'); lagerortC.textContent = r.lagerort || '…';
-                lagerortC.style.color = C.muted;
-
-                // Actions
-                const actC = mkCell();
-                actC.style.gap = '2px';
-                const addBtn = tsActionBtn(I_PLUS, 'Speichern');
-                const ckBtn  = tsActionBtn(I_CHECK, 'Gespeichert');
-                ckBtn.style.color = C.green;
-                const rmBtn  = tsActionBtn(I_TRASH, 'Entfernen');
-                rmBtn.addEventListener('mouseenter', ()=>rmBtn.style.color=C.danger);
-                rmBtn.addEventListener('mouseleave', ()=>rmBtn.style.color=C.muted);
-
-                if (isSaved) {
-                    actC.appendChild(ckBtn);
-                    actC.appendChild(rmBtn);
-                    rmBtn.onclick = () => {
-                        const cur=tsLoad(), idx=cur.findIndex(e=>e.part===r.part);
-                        if(idx>=0){cur.splice(idx,1);tsSave(cur);}
-                        tsToast(`🗑️ "${r.part}" entfernt`);
-                        rebuildBody();
-                    };
-                } else {
-                    actC.appendChild(addBtn);
-                    addBtn.onclick = () => {
-                        const cur=tsLoad();
-                        if(!cur.find(e=>e.part===r.part)) { cur.push({part:r.part,desc:r.desc,uom:r.uom,key:r.desc}); tsSave(cur); }
-                        tsToast(`✅ "${r.part}" gespeichert`);
-                        addBtn.replaceWith(ckBtn);
-                    };
-                }
-
-                // Assemble row — set data-part on all cells
-                for (const c of cells) { c.dataset.part = r.part; }
-                // dummy container for data-part lookup
-                const rowWrap = tsEl('div', {display:'contents'});
-                rowWrap.dataset.part = r.part;
-                cells.forEach(c => grid.appendChild(c));
-            }
-            wrap.appendChild(grid);
-        }
-
-        // Gespeicherte Teile section
-        const savedList = tsLoad();
-        if (savedList.length > 0) {
-            const sep = tsEl('div', {margin:'0 12px',borderTop:`1px solid ${C.border}`,paddingTop:'10px',paddingBottom:'4px'});
-            const secLbl = tsEl('div', {padding:'4px 8px 8px',fontSize:'11px',color:C.muted,fontWeight:'600',letterSpacing:'.05em',textTransform:'uppercase'});
-            secLbl.textContent = `Gespeicherte Teile (${savedList.length})`;
-            sep.appendChild(secLbl);
-            for (const entry of savedList) {
-                const row = tsEl('div', {display:'flex',alignItems:'center',gap:'8px',padding:'5px 8px',borderRadius:'4px',cursor:'default'});
-                row.addEventListener('mouseenter', ()=>row.style.background=C.bg2);
-                row.addEventListener('mouseleave', ()=>row.style.background='transparent');
-                const num = tsEl('span', {fontFamily:'monospace',fontSize:'12px',color:C.accent,fontWeight:'600',flexShrink:'0'});
-                num.textContent = entry.part;
-                const dsc = tsEl('span', {fontSize:'12px',color:C.muted,flex:'1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'});
-                dsc.textContent = entry.desc || entry.key || '';
-                const cp = tsActionBtn(I_COPY, 'Kopieren');
-                cp.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
-                const rm = tsActionBtn(I_TRASH, 'Entfernen');
-                rm.addEventListener('mouseenter', ()=>rm.style.color=C.danger);
-                rm.addEventListener('mouseleave', ()=>rm.style.color=C.muted);
-                rm.onclick = () => {
-                    const cur=tsLoad(), idx=cur.findIndex(e=>e.part===entry.part);
-                    if(idx>=0){cur.splice(idx,1);tsSave(cur);}
-                    row.remove();
-                    tsToast(`🗑️ "${entry.part}" entfernt`);
-                };
-                row.appendChild(num); row.appendChild(dsc); row.appendChild(cp); row.appendChild(rm);
-                sep.appendChild(row);
-            }
-            wrap.appendChild(sep);
-        }
-
-        return wrap;
-    }
-
-    let _currentResults = null;
-    let _currentBody = null;
-
-    function rebuildBody() {
-        if (!_currentBody) return;
-        _currentBody.innerHTML = '';
-        const saved = tsLoad();
-        _currentBody.appendChild(tsBuildGrid(_currentResults, saved));
-    }
-
-    function showTeilesuche() {
-        const existing = document.getElementById('apmgod-ts');
-        if (existing) { existing.remove(); return; }
-
-        // Outer popup
-        const popup = tsEl('div', {
-            position:'fixed', top:'52px', left:'50%', transform:'translateX(-50%)',
-            width:'860px', maxWidth:'calc(100vw - 40px)',
-            background:C.bg0, border:`1px solid ${C.border}`,
-            borderRadius:'8px', boxShadow:C.shadow,
-            zIndex:'100001', display:'flex', flexDirection:'column',
-            maxHeight:'calc(100vh - 80px)', fontFamily:'Arial,sans-serif',
-            overflow:'hidden',
-        });
-        popup.id = 'apmgod-ts';
-
-        // Restore position
-        try {
-            const pos = JSON.parse(localStorage.getItem('apmgod-ts-pos')||'null');
-            if (pos) { popup.style.left=pos.left; popup.style.top=pos.top; popup.style.transform='none'; }
-        } catch(_) {}
-
-        // ── Header ──
-        const hdr = tsEl('div', {
-            display:'flex', alignItems:'center', gap:'8px', padding:'10px 14px',
-            borderBottom:`1px solid ${C.border}`, flexShrink:'0',
-            background:C.bg1, cursor:'grab', userSelect:'none',
-            borderRadius:'8px 8px 0 0',
-        });
-        const title = tsEl('span', {fontSize:'13px',fontWeight:'700',color:C.text,flexShrink:'0'});
-        title.textContent = 'Teilesuche';
-
-        // site selector
-        const site = document.createElement('select');
-        tsStyle(site, {background:C.bg2,border:`1px solid ${C.border}`,color:C.text,borderRadius:'4px',padding:'3px 6px',fontSize:'12px',cursor:'pointer'});
-        site.innerHTML = '<option value="FRA7" selected>FRA7</option>';
-
-        // dataspy selector
-        const dsSel = document.createElement('select');
-        tsStyle(dsSel, {background:C.bg2,border:`1px solid ${C.border}`,color:C.text,borderRadius:'4px',padding:'3px 6px',fontSize:'12px',cursor:'pointer'});
-        dsSel.innerHTML = '<option value="82" selected>All Parts</option><option value="100455">Parts in Service</option><option value="101496">Parts in my Stores</option>';
-
-        // search inputs
-        function mkInput(ph) {
-            const inp = document.createElement('input');
-            inp.type = 'search'; inp.placeholder = ph;
-            tsStyle(inp, {flex:'1',minWidth:'80px',background:C.bg2,border:`1px solid ${C.border}`,color:C.text,
-                borderRadius:'4px',padding:'4px 8px',fontSize:'12px',outline:'none'});
-            inp.addEventListener('focus', ()=>inp.style.borderColor=C.accent);
-            inp.addEventListener('blur',  ()=>inp.style.borderColor=C.border);
-            return inp;
-        }
-        const inpPart = mkInput('Teile-Nr.');
-        const inpDesc = mkInput('Beschreibung');
-        const inpMfr  = mkInput('Hersteller-Nr.');
-
-        // close button
-        const closeBtn = tsEl('button', {background:'transparent',border:'none',cursor:'pointer',
-            color:C.muted,fontSize:'18px',lineHeight:'1',padding:'0 2px',flexShrink:'0'});
-        closeBtn.type = 'button'; closeBtn.title = 'Schließen'; closeBtn.textContent = '×';
-        closeBtn.addEventListener('mouseenter', ()=>closeBtn.style.color=C.text);
-        closeBtn.addEventListener('mouseleave', ()=>closeBtn.style.color=C.muted);
-        closeBtn.onclick = () => popup.remove();
-
-        hdr.appendChild(title);
-        hdr.appendChild(tsEl('span', {flex:'1'}));
-        hdr.appendChild(site);
-        hdr.appendChild(dsSel);
-        hdr.appendChild(inpPart);
-        hdr.appendChild(inpDesc);
-        hdr.appendChild(inpMfr);
-        hdr.appendChild(closeBtn);
-
-        // ── Body ──
-        const body = tsEl('div', {flex:'1',overflowY:'auto',minHeight:'120px'});
-        _currentBody = body;
-        _currentResults = null;
-        body.appendChild(tsBuildGrid(null, tsLoad()));
-
-        popup.appendChild(hdr);
-        popup.appendChild(body);
-        document.body.appendChild(popup);
-
-        // Draggable
-        let drag=false, ox=0, oy=0;
-        hdr.addEventListener('mousedown', e => {
-            if (e.target.closest('select,input,button')) return;
-            drag=true; hdr.style.cursor='grabbing';
-            const r=popup.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top;
-            popup.style.transform='none';
-        });
-        document.addEventListener('mousemove', e => {
-            if (!drag) return;
-            popup.style.left=(e.clientX-ox)+'px'; popup.style.top=(e.clientY-oy)+'px';
-        });
-        document.addEventListener('mouseup', () => {
-            if (drag) {
-                hdr.style.cursor='grab';
-                const r=popup.getBoundingClientRect();
-                localStorage.setItem('apmgod-ts-pos', JSON.stringify({left:r.left+'px',top:r.top+'px'}));
-            }
-            drag=false;
-        });
-
-        // Search logic
-        let timer;
-        function doSearch() {
-            const pq=inpPart.value.trim(), dq=inpDesc.value.trim(), mq=inpMfr.value.trim();
-            if (!pq&&!dq&&!mq) return;
-            body.innerHTML = '';
-            const loading = tsEl('div', {padding:'32px',color:C.muted,fontSize:'13px',textAlign:'center'});
-            loading.textContent = 'Suche läuft…';
-            body.appendChild(loading);
-            tsSearch(pq, dq, mq, dsSel.value).then(results => {
-                _currentResults = results;
-                body.innerHTML = '';
-                body.appendChild(tsBuildGrid(results, tsLoad()));
-                // lazy stock enrichment
-                const grid = body.querySelector('[data-part]')?.parentElement;
-                if (results.length) tsEnrichStock(results, body);
-            });
-        }
-
-        [inpPart, inpDesc, inpMfr].forEach(inp => {
-            inp.addEventListener('input', () => { clearTimeout(timer); if(inp.value.trim()) timer=setTimeout(doSearch,350); });
-            inp.addEventListener('keydown', e => { if(e.key==='Enter'){clearTimeout(timer);doSearch();} });
-        });
-
-        setTimeout(() => inpDesc.focus(), 50);
-    }
-
-    // ALT+5 toggle
-    document.addEventListener('keydown', e => {
-        if (e.altKey && e.key==='5') { e.preventDefault(); showTeilesuche(); }
-    });
-
-    // Trigger button (fixed, oben rechts)
-    (function() {
-        if (document.getElementById('apmgod-ts-btn')) return;
-        const btn = tsEl('button', {
-            position:'fixed', top:'6px', right:'155px', zIndex:'99999',
-            height:'28px', padding:'0 12px', fontSize:'12px', fontWeight:'600',
-            cursor:'pointer', borderRadius:'4px', fontFamily:'Arial,sans-serif',
-            border:`1px solid ${C.border}`, background:C.bg1, color:C.text,
-            display:'flex', alignItems:'center', gap:'6px', transition:'all .15s',
-        });
-        btn.id = 'apmgod-ts-btn';
-        btn.type = 'button';
-        btn.title = 'Teilesuche (ALT+5)';
-        btn.innerHTML = I_COPY + ' Teilesuche';
-        btn.addEventListener('mouseenter', ()=>{btn.style.borderColor=C.accent;btn.style.color=C.accent;});
-        btn.addEventListener('mouseleave', ()=>{btn.style.borderColor=C.border;btn.style.color=C.text;});
-        btn.onclick = showTeilesuche;
-        document.body.appendChild(btn);
-    })();
 
 })();
