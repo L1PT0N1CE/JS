@@ -884,7 +884,7 @@
                     if (node.nodeType !== 1) continue;
                     const h6 = node.matches?.('.x-message-box') ? node.querySelector('h6')
                               : node.querySelector?.('.x-message-box h6');
-                    if (!h6 || !h6.textContent.includes('No valid Rate')) continue;
+                    if (!h6 || (!h6.textContent.includes('No valid Rate') && !h6.textContent.includes('Unable to retrieve records'))) continue;
                     const box = h6.closest('.x-message-box') || node;
                     // sofort unsichtbar + mask entfernen
                     box.style.display = 'none';
