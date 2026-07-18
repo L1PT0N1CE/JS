@@ -197,7 +197,7 @@
         injectPanelStyles();
 
         const storedEmployee = localStorage.getItem('lastSelectedEmployee') || names[0];
-        const storedDate     = getFormattedToday();
+        const storedDate     = localStorage.getItem('lastSelectedDatework') || getFormattedToday();
         agSelectedOctype     = localStorage.getItem('lastSelectedOctype')   || 'N';
         agSelectedHours      = localStorage.getItem('lastSelectedHrswork')  || '1';
 
@@ -252,14 +252,6 @@
                 <button class="ag-submit-btn" id="apmgod-submit">Arbeit buchen</button>
             </div>
         `;
-        // Position wiederherstellen
-        const savedPanelTop  = localStorage.getItem('apmgod_panel_top');
-        const savedPanelLeft = localStorage.getItem('apmgod_panel_left');
-        if (savedPanelTop && savedPanelLeft) {
-            panel.style.top   = savedPanelTop;
-            panel.style.left  = savedPanelLeft;
-            panel.style.right = 'auto';
-        }
         document.body.appendChild(panel);
 
         // Apply correct initial octype toggle state
@@ -284,14 +276,7 @@
             panel.style.top   = (e.clientY - oy) + 'px';
             panel.style.right = 'auto';
         });
-        document.addEventListener('mouseup', () => {
-            if (dragging) {
-                const r = panel.getBoundingClientRect();
-                localStorage.setItem('apmgod_panel_top',  r.top  + 'px');
-                localStorage.setItem('apmgod_panel_left', r.left + 'px');
-            }
-            dragging = false;
-        });
+        document.addEventListener('mouseup', () => { dragging = false; });
 
         // Close
         panel.querySelector('.ag-close').onclick = () => panel.remove();
@@ -782,9 +767,8 @@
     // SECTION 7: Auto-Confirm "Date Worked outside range" (EN + DE)
     // ─────────────────────────────────────────────
 
-    const TARGET_TEXT_EN   = 'Date Worked falls outside of the scheduled date range for this activity';
-    const TARGET_TEXT_DE   = "Das 'Arbeitsdatum' liegt außerhalb des eingeplanten Datumsbereichs";
-    const TARGET_TEXT_RATE = 'No valid Rate exists for this Department, Trade, Date Worked, and Occupation Type';
+    const TARGET_TEXT_EN = 'Date Worked falls outside of the scheduled date range for this activity';
+    const TARGET_TEXT_DE = "Das 'Arbeitsdatum' liegt außerhalb des eingeplanten Datumsbereichs";
 
     function checkAndDismiss() {
         const dialogs = document.querySelectorAll('.x-message-box.x-window');
@@ -792,9 +776,7 @@
             if (dialog.getAttribute('aria-hidden') === 'true') return;
 
             const textContent = dialog.innerText || dialog.textContent || '';
-            const isMatch = textContent.includes(TARGET_TEXT_EN)
-                         || textContent.includes(TARGET_TEXT_DE)
-                         || textContent.includes(TARGET_TEXT_RATE);
+            const isMatch = textContent.includes(TARGET_TEXT_EN) || textContent.includes(TARGET_TEXT_DE);
             if (!isMatch) return;
 
             const yesBtn = dialog.querySelector('a.uft-id-yes');
@@ -803,13 +785,7 @@
             if (yesBtn.style.display === 'none') return;
 
             console.log('[EAM AutoConfirm] Dialog erkannt – klicke automatisch "Yes/Ja"');
-            // ExtJS-Component via compId feuern (zuverlässiger als DOM .click())
-            try {
-                const compId = yesBtn.getAttribute('data-componentid');
-                const extBtn = (typeof unsafeWindow !== 'undefined' ? unsafeWindow.Ext : Ext).getCmp(compId);
-                if (extBtn) { extBtn.fireEvent('click', extBtn); return; }
-            } catch(e) {}
-            yesBtn.click(); // DOM-Fallback
+            yesBtn.click();
         });
     }
 
