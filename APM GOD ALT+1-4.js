@@ -882,17 +882,14 @@
             for (const m of mutations) {
                 for (const node of m.addedNodes) {
                     if (node.nodeType !== 1) continue;
-                    // EAM message box mit "No valid Rate" text?
                     const h6 = node.matches?.('.x-message-box') ? node.querySelector('h6')
                               : node.querySelector?.('.x-message-box h6');
                     if (!h6 || !h6.textContent.includes('No valid Rate')) continue;
-                    // Yes-Button klicken
                     const box = h6.closest('.x-message-box') || node;
+                    // sofort unsichtbar machen — user sieht nix
+                    box.style.visibility = 'hidden';
                     const yesBtn = box.querySelector('.uft-id-yes');
-                    if (yesBtn) {
-                        setTimeout(() => yesBtn.click(), 80);
-                        console.log('[APM God] Auto-Yes: No valid Rate dialog bestätigt');
-                    }
+                    if (yesBtn) yesBtn.click();
                 }
             }
         });
