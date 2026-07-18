@@ -886,8 +886,11 @@
                               : node.querySelector?.('.x-message-box h6');
                     if (!h6 || !h6.textContent.includes('No valid Rate')) continue;
                     const box = h6.closest('.x-message-box') || node;
-                    // sofort unsichtbar machen — user sieht nix
-                    box.style.visibility = 'hidden';
+                    // sofort unsichtbar + mask entfernen
+                    box.style.display = 'none';
+                    // EAM mask (overlay hinter dem dialog) auch weg
+                    const mask = document.querySelector('.x-mask:last-of-type');
+                    if (mask) mask.style.display = 'none';
                     const yesBtn = box.querySelector('.uft-id-yes');
                     if (yesBtn) yesBtn.click();
                 }
