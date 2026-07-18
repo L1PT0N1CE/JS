@@ -876,624 +876,450 @@
     console.log('[EAM AutoConfirm] Script aktiv – überwacht auf Date-Worked-Dialog (EN + DE).');
 
     // ─────────────────────────────────────────────
-    // ─────────────────────────────────────────────
-    // SECTION 8: Teilesuche ALT+5 — 1:1 APM Master
+    // SECTION 8: Teilesuche ALT+5
     // ─────────────────────────────────────────────
 
-    // Shared storage with Partnumbers script
     const TS_KEY = 'partcodeMap_v3';
+    function tsLoad() { try { return JSON.parse(localStorage.getItem(TS_KEY)) || []; } catch(e) { return []; } }
+    function tsSave(m) { try { localStorage.setItem(TS_KEY, JSON.stringify(m)); } catch(e) {} }
 
-    function tsLoad() {
-        try { return JSON.parse(localStorage.getItem(TS_KEY)) || []; } catch(e) { return []; }
+    // SVG icons (inline)
+    const I_COPY   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    const I_PLUS   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+    const I_CHECK  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="20 6 9 17 4 12"/></svg>`;
+    const I_TRASH  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
+
+    // Colors (dark theme, standalone — kein APM Master nötig)
+    const C = {
+        bg0:     '#151c2a', bg1: '#1a2235', bg2: '#202b40', bg3: '#252f42',
+        border:  '#2a3447', borderHover: '#3b4d6b',
+        text:    '#c8d4e8', muted: '#64748b', dim: '#475569',
+        accent:  '#3b82f6', accentHover: '#2563eb',
+        danger:  '#ef4444', green: '#22c55e',
+        shadow:  '0 8px 32px rgba(0,0,0,.6)',
+    };
+
+    function tsStyle(el, props) { Object.assign(el.style, props); return el; }
+    function tsEl(tag, props) {
+        const el = document.createElement(tag);
+        if (props) Object.assign(el.style, props);
+        return el;
     }
-    function tsSave(m) {
-        try { localStorage.setItem(TS_KEY, JSON.stringify(m)); } catch(e) {} }
+
+    function tsToast(msg) {
+        const t = tsEl('div', {position:'fixed',bottom:'24px',left:'50%',transform:'translateX(-50%)',
+            background:C.bg1,border:`1px solid ${C.border}`,color:C.text,padding:'8px 18px',
+            borderRadius:'6px',fontSize:'13px',zIndex:'2000001',boxShadow:C.shadow,
+            whiteSpace:'nowrap',pointerEvents:'none',fontFamily:'inherit'});
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.transition='opacity .3s'; t.style.opacity='0'; setTimeout(() => t.remove(), 320); }, 2000);
+    }
+
+    function tsActionBtn(icon, title) {
+        const b = tsEl('button', {background:'transparent',border:'none',cursor:'pointer',
+            color:C.muted,padding:'3px',borderRadius:'4px',display:'flex',alignItems:'center',
+            transition:'color .15s',flexShrink:'0'});
+        b.type = 'button'; b.title = title; b.innerHTML = icon;
+        b.addEventListener('mouseenter', () => b.style.color = C.text);
+        b.addEventListener('mouseleave', () => b.style.color = C.muted);
+        return b;
+    }
+
+    // APMApi shortcut
+    function tsAPM() {
+        try { return (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window).APMApi?.get?.('partsCatalog'); } catch(_) { return null; }
+    }
 
     function tsGetSession() {
-        // 1. URL params (works in loadmain iframes)
         try { const p = new URLSearchParams(window.location.search), e = p.get('eamid'), t = p.get('tenant'); if (e) return {eamid:e,tenant:t||'AMAZONRMEEU_PRD'}; } catch(_){}
-        // 2. iframe[src*=eamid] check (COMMON page hat EAM iframes)
-        try { const top = window !== window.top ? window.top : window, f = top.document.querySelector('iframe[src*="eamid="]'); if (f) { const p2 = new URL(f.src).searchParams, e = p2.get('eamid'); if (e) return {eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'}; } } catch(_){}
-        // 3. EAM.SessionStorage (zuverlässigste Methode auf COMMON page)
+        try { const f = (window !== window.top ? window.top : window).document.querySelector('iframe[src*="eamid="]'); if (f) { const p2 = new URL(f.src).searchParams, e = p2.get('eamid'); if (e) return {eamid:e,tenant:p2.get('tenant')||'AMAZONRMEEU_PRD'}; } } catch(_){}
         try { for (const w of [window, unsafeWindow, window.top]) { const ss = w?.EAM?.SessionStorage; if (ss?.eamid) return {eamid:ss.eamid,tenant:ss.tenant||'AMAZONRMEEU_PRD'}; } } catch(_){}
-        // 4. APMApi partsCatalog getImageUrl (hat eamid in URL)
         try { const cat = (unsafeWindow||window).APMApi?.get?.('partsCatalog'); if (cat?.getImageUrl) { const url = cat.getImageUrl('x')||''; const m = url.match(/eamid=([^&]+)/); if (m?.[1]) return {eamid:m[1],tenant:'AMAZONRMEEU_PRD'}; } } catch(_){}
-        // 5. gAppData initparams (EAM setzt das nach SAML-Redirect)
         try { const g = (unsafeWindow||window).top?.gAppData?.initparams; if (g?.eamid) return {eamid:g.eamid,tenant:g.tenant||'AMAZONRMEEU_PRD'}; } catch(_){}
         return null;
     }
 
-    // GM fetch wrapper — wie APM Master: bypasses TM-Sandbox CORS mit GM_xmlhttpRequest
     function tsGmFetch(url, params) {
         return new Promise((resolve, reject) => {
             if (typeof GM_xmlhttpRequest === 'undefined') {
-                // fallback auf normales fetch (z.B. wenn @grant fehlt)
                 fetch(url, {method:'POST',credentials:'include',headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},body:new URLSearchParams(params).toString()})
                     .then(r => r.text()).then(resolve).catch(reject);
                 return;
             }
-            GM_xmlhttpRequest({
-                method: 'POST', url,
-                headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
-                data: new URLSearchParams(params).toString(),
-                withCredentials: true,
-                onload:    r => resolve(r.responseText),
-                onerror:   () => reject(new Error('GM_xhr error')),
-                ontimeout: () => reject(new Error('GM_xhr timeout')),
-                timeout:   15000
-            });
+            GM_xmlhttpRequest({method:'POST',url,headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8','X-Requested-With':'XMLHttpRequest'},
+                data:new URLSearchParams(params).toString(),withCredentials:true,
+                onload:r=>resolve(r.responseText),onerror:()=>reject(new Error('GM_xhr')),
+                ontimeout:()=>reject(new Error('timeout')),timeout:15000});
         });
     }
 
     async function tsSearch(partcode, description, mfr, dataspyId) {
-        const pq = (partcode||'').trim(), dq = (description||'').trim(), mq = (mfr||'').trim();
+        const pq=(partcode||'').trim(), dq=(description||'').trim(), mq=(mfr||'').trim();
         if (!pq && !dq && !mq) return [];
-
-        // Primär: APMApi.searchCatalog — kein CORS, kein Session-Gebastel
+        // Primär: APMApi (kein CORS, kein Session-Problem)
         try {
-            const cat = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window)?.APMApi?.get?.('partsCatalog');
+            const cat = tsAPM();
             if (cat?.searchCatalog) {
-                const res = await cat.searchCatalog(
-                    {partcode: pq, description: dq, mfr: mq},
-                    {limit: 50, dataspyId: dataspyId || '101496'}
-                );
-                return (res.records || []).map(row => ({
-                    part:     row.partcode    || '',
-                    desc:     row.description || '',
-                    uom:      row.uom         || '',
-                    bestand:  '',
-                    lager:    '',
-                    lagerort: '',
-                    pic:      row.profilepicture || '',
-                })).filter(r => r.part);
+                const res = await cat.searchCatalog({partcode:pq,description:dq,mfr:mq},{limit:50,dataspyId:dataspyId||'101496'});
+                return (res.records||[]).map(r=>({part:r.partcode||'',desc:r.description||'',uom:r.uom||'',pic:r.profilepicture||'',bestand:'',lager:'',lagerort:''})).filter(r=>r.part);
             }
-        } catch(e) { console.warn('[Teilesuche] searchCatalog:', e.message); }
-
-        // Fallback: direkte SSPART.xmlhttp (wenn APMApi fehlt)
+        } catch(e) { console.warn('[TS] APMApi:', e.message); }
+        // Fallback: SSPART.xmlhttp
         const s = tsGetSession();
-        if (!s) { console.warn('[Teilesuche] Session nicht gefunden'); return []; }
-        const params = {
-            GRID_NAME:'SSPART', USER_FUNCTION_NAME:'SSPART', SYSTEM_FUNCTION_NAME:'SSPART',
-            CURRENT_TAB_NAME:'LST', COMPONENT_INFO_TYPE:'DATA_ONLY', FORCE_REQUERY:'YES', MAX_ROWS:'50',
-            DATASPY_ID: dataspyId || '101496', GRID_ID:'80', eamid: s.eamid, tenant: s.tenant,
-        };
-        let seq = 1;
-        if (pq) { params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='partcode'; params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS'; params[`MADDON_FILTER_VALUE_${seq}`]=pq; params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq); params[`MADDON_FILTER_JOINER_${seq}`]='AND'; params[`MADDON_LPAREN_${seq}`]='false'; params[`MADDON_RPAREN_${seq}`]='false'; seq++; }
-        if (dq) { params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description'; params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS'; params[`MADDON_FILTER_VALUE_${seq}`]=dq; params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq); params[`MADDON_FILTER_JOINER_${seq}`]='AND'; params[`MADDON_LPAREN_${seq}`]='false'; params[`MADDON_RPAREN_${seq}`]='false'; seq++; }
+        if (!s) { console.warn('[TS] keine session'); return []; }
+        const params = {GRID_NAME:'SSPART',USER_FUNCTION_NAME:'SSPART',SYSTEM_FUNCTION_NAME:'SSPART',
+            CURRENT_TAB_NAME:'LST',COMPONENT_INFO_TYPE:'DATA_ONLY',FORCE_REQUERY:'YES',MAX_ROWS:'50',
+            DATASPY_ID:dataspyId||'101496',GRID_ID:'80',eamid:s.eamid,tenant:s.tenant};
+        let seq=1;
+        if(pq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='partcode';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=pq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
+        if(dq){params[`MADDON_FILTER_ALIAS_NAME_${seq}`]='description';params[`MADDON_FILTER_OPERATOR_${seq}`]='CONTAINS';params[`MADDON_FILTER_VALUE_${seq}`]=dq;params[`MADDON_FILTER_SEQNUM_${seq}`]=String(seq);params[`MADDON_FILTER_JOINER_${seq}`]='AND';params[`MADDON_LPAREN_${seq}`]='false';params[`MADDON_RPAREN_${seq}`]='false';seq++;}
         try {
             const text = await tsGmFetch('https://eu1.eam.hxgnsmartcloud.com/web/base/SSPART.xmlhttp', params);
             const json = JSON.parse(text);
-            const rows = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA || [];
+            const rows = json?.pageData?.grid?.GRIDRESULT?.GRID?.DATA||[];
             const seen = new Set();
-            return rows.filter(row => { const p=row.partcode||''; if(!p||seen.has(p)) return false; seen.add(p); return true; })
-                .map(row => ({
-                    part: row.partcode||'', desc: row.description||row.partdescription||'',
-                    uom: row.uom||'', bestand: row.qty||row.balance||'',
-                    lager: row.numberOfStores||'', lagerort: row.bin||row.storelocation||'',
-                    pic: row.profilepicture||'',
-                })).filter(r => r.part);
-        } catch(e) { console.warn('[Teilesuche]', e.message); return []; }
+            return rows.filter(r=>{const p=r.partcode||'';if(!p||seen.has(p))return false;seen.add(p);return true;})
+                .map(r=>({part:r.partcode||'',desc:r.description||r.partdescription||'',uom:r.uom||'',
+                    bestand:r.qty||r.balance||'',lager:r.numberOfStores||'',lagerort:r.bin||r.storelocation||'',pic:r.profilepicture||''})).filter(r=>r.part);
+        } catch(e) { console.warn('[TS]', e.message); return []; }
     }
 
-    // SVG icons
-    const TS_SVG_CARET  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
-    const TS_SVG_CLOSE  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:14px;height:14px;display:block;pointer-events:none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-    const TS_SVG_COPY   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-    const TS_SVG_PLUS   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
-    const TS_SVG_CHECK  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    const TS_SVG_REMOVE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:13px;height:13px;display:block;pointer-events:none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`;
-
-    // Fallback CSS for when APM Master isn't loaded (uses same var names with hardcoded fallbacks)
-    function tsInjectFallbackCSS() {
-        if (document.getElementById('apmgod-ts-fallback')) return;
-        // Only inject if APM Master's CSS is missing
-        if (getComputedStyle(document.documentElement).getPropertyValue('--apm-surface-0').trim()) return;
-        const s = document.createElement('style');
-        s.id = 'apmgod-ts-fallback';
-        s.textContent = ':root{--apm-surface-0:#1e2738;--apm-surface-inset:#151b27;--apm-surface-sunken:#0f1621;--apm-surface-raised:#252f42;--apm-border:#2a3447;--apm-text-primary:#c8d4e8;--apm-text-bright:#e2e8f0;--apm-text-muted:#64748b;--apm-text-disabled:#475569;--apm-text-secondary:#94a3b8;--apm-accent:#3b82f6;--apm-accent-hover:#2563eb;--apm-danger:#ef4444;--apm-overlay-light:rgba(255,255,255,.05);--apm-control-bg:rgba(255,255,255,.08);--apm-font-mono:monospace;--apm-text-xs:11px;--apm-text-sm:12px;--apm-text-base:13px;--apm-text-md:13px;--apm-text-lg:15px;--apm-radius-sm:4px;--apm-radius:6px;--apm-radius-lg:8px;--apm-shadow:0 4px 16px rgba(0,0,0,.4);--apm-field-bg:#0f1621;--apm-field-border:#2a3447;--apm-field-text:#c8d4e8;--apm-input-focus:rgba(59,130,246,.25);--apm-input-bg:#0f1621;}';
-        document.head.appendChild(s);
-    }
-
-    function tsEl(tag, cls, style) {
-        const e = document.createElement(tag);
-        if (cls) e.className = cls;
-        if (style) e.style.cssText = style;
-        return e;
-    }
-
-    function tsActionBtn(icon, title, extraCls) {
-        const b = tsEl('button', `apm-btn apm-btn--neutral${extraCls?' '+extraCls:''}`,
-            'display:inline-flex;align-items:center;justify-content:center;width:28px;height:26px;padding:0;cursor:pointer;border-radius:var(--apm-radius-sm,4px);border:1px solid var(--apm-border,#2a3447);background:transparent;color:var(--apm-text-secondary,#94a3b8);transition:color .12s,border-color .12s,background .12s;');
-        b.innerHTML = icon;
-        b.title = title;
-        b.addEventListener('mouseenter', () => { b.style.color='var(--apm-text-primary,#e2e8f0)'; b.style.background='var(--apm-control-bg,rgba(255,255,255,.08))'; });
-        b.addEventListener('mouseleave', () => { b.style.color='var(--apm-text-secondary,#94a3b8)'; b.style.background='transparent'; });
-        return b;
-    }
-
-    // Build one data row (display:contents — cells are direct grid children)
-    function tsMakeRow(grid, cells8, isHovered) {
-        const row = tsEl('div', 'apm-pb-row');
-        cells8.forEach(c => row.appendChild(c));
-        row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
-        row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
-        grid.appendChild(row);
-        return row;
-    }
-
-    function tsCell(extraCls) {
-        return tsEl('div', `apm-pb-cell apm-pb-cell-${extraCls}`);
-    }
-
-    function tsImgCell(r) {
-        const c = tsCell('image');
-        if (r.pic) {
-            const img = tsEl('img', 'apm-pb-row-img is-clickable');
-            img.src = `https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${r.eamid}&tenant=AMAZONRMEEU_PRD`;
-            img.alt = '';
-            img.title = 'Zum Vergrößern klicken';
-            img.addEventListener('click', () => {
-                const overlay = tsEl('div', '', 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000001;display:flex;align-items:center;justify-content:center;cursor:zoom-out;');
-                const big = tsEl('img', '', 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;');
-                big.src = img.src;
-                overlay.appendChild(big);
-                overlay.onclick = () => overlay.remove();
-                document.body.appendChild(overlay);
-            });
-            c.appendChild(img);
-        } else {
-            const ph = tsEl('div', 'apm-pb-img-placeholder');
-            ph.textContent = '—';
-            c.appendChild(ph);
-        }
-        return c;
-    }
-
-    function tsPartCell(part, eamid) {
-        const c = tsCell('part');
-        c.dataset.apmTip = part;
-        const link = tsEl('a', 'apm-ps-part-link');
-        link.href = `https://eu1.eam.hxgnsmartcloud.com/web/base/logindisp?tenant=AMAZONRMEEU_PRD&SYSTEM_FUNCTION_NAME=SSPART&USER_FUNCTION_NAME=SSPART&DRILLBACK=YES&partcode=${encodeURIComponent(part)}`;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.title = `${part} in neuem Tab öffnen`;
-        link.textContent = part;
-        const copyIcon = tsEl('span', 'apm-copy-icon', 'margin-left:6px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
-        copyIcon.innerHTML = TS_SVG_COPY;
-        copyIcon.title = 'APN kopieren';
-        copyIcon.addEventListener('mouseenter', () => copyIcon.style.opacity = '1');
-        copyIcon.addEventListener('mouseleave', () => copyIcon.style.opacity = '.5');
-        copyIcon.onclick = (e) => { e.preventDefault(); navigator.clipboard.writeText(part); tsToast(`📋 ${part} kopiert`); };
-        c.appendChild(link);
-        c.appendChild(copyIcon);
-        return c;
-    }
-
-    function tsDescCell(part, desc) {
-        const c = tsCell('desc');
-        c.dataset.apn = part;
-        const span = tsEl('span', 'apm-ps-desc-text');
-        span.textContent = desc;
-        span.title = desc;
-        const copyIcon = tsEl('span', 'apm-copy-icon apm-copy-title-icon', 'margin-left:4px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
-        copyIcon.innerHTML = TS_SVG_COPY;
-        copyIcon.title = 'APN + Beschreibung kopieren';
-        copyIcon.addEventListener('mouseenter', () => copyIcon.style.opacity = '1');
-        copyIcon.addEventListener('mouseleave', () => copyIcon.style.opacity = '.5');
-        copyIcon.onclick = () => { navigator.clipboard.writeText(`${part} – ${desc}`); tsToast(`📋 ${part} + Beschreibung kopiert`); };
-        c.appendChild(span);
-        c.appendChild(copyIcon);
-        return c;
-    }
-
-    function tsRebuildGrid(searchResults) {
-        const body = document.getElementById('apmgod-ts-body');
-        if (!body) return;
-        body.innerHTML = '';
-
-        const grid = tsEl('div', 'apm-pb-grid');
-        grid.id = 'apmgod-ts-grid';
-        grid.style.gridTemplateColumns = '52px minmax(110px, 1fr) minmax(180px, 2.2fr) 58px 64px 56px minmax(76px, 1fr) 210px';
-
-        // ── Column header row ──
-        const hdrRow = tsEl('div', 'apm-pb-row apm-pb-row-header');
-        [['image','Bild'],['part','Teil'],['desc','Beschreibung'],['instock','Bestand'],['stores','Lager'],['uom','UOM'],['location','Lagerort'],['actions','Aktionen']].forEach(([col, label]) => {
-            const th = tsEl('div', `apm-pb-col-header apm-pb-cell-${col}`);
-            th.dataset.col = col;
-            const lbl = tsEl('div', 'apm-pb-col-label');
-            lbl.textContent = label;
-            th.appendChild(lbl);
-            hdrRow.appendChild(th);
-        });
-        grid.appendChild(hdrRow);
-
-        // ── Search results ──
-        if (Array.isArray(searchResults)) {
-            const secLbl = tsEl('div', 'apm-pb-section-label');
-            secLbl.textContent = searchResults.length > 0 ? `Suchergebnisse (${searchResults.length})` : '';
-            if (searchResults.length === 0) {
-                secLbl.className = 'apm-pb-empty';
-                const dsEl = document.getElementById('apmgod-ts-dataspy');
-                const dsLabel = dsEl?.selectedOptions?.[0]?.textContent || 'Parts';
-                const site = document.getElementById('apmgod-ts-site')?.value || 'FRA7';
-                secLbl.textContent = `Keine Treffer — ${dsLabel} · ${site}`;
-            }
-            grid.appendChild(secLbl);
-
-            if (searchResults.length > 0) {
-                const saved = tsLoad();
-                searchResults.forEach(r => {
-                    const isSaved = saved.some(e => e.part === r.part);
-                    const row = tsEl('div', 'apm-pb-row');
-                    row.dataset.part = r.part;
-                    if (isSaved) row.style.opacity = '.55';
-                    row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
-                    row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
-
-                    // instock cell
-                    const instock = tsCell('instock'); instock.textContent = r.bestand || '—';
-                    // stores cell
-                    const stores = tsCell('stores'); stores.textContent = r.lager || '—';
-                    if (r.lager) stores.title = `${r.lager} Lager`;
-                    // uom cell
-                    const uom = tsCell('uom'); uom.textContent = r.uom;
-                    // location cell
-                    const loc = tsCell('location');
-                    const locSpan = tsEl('span', 'apm-ps-loc-text'); locSpan.textContent = r.lagerort || '—';
-                    if (r.lagerort) {
-                        const locCopy = tsEl('span', 'apm-copy-icon', 'margin-left:6px;cursor:pointer;opacity:.5;flex-shrink:0;display:inline-flex;align-items:center;');
-                        locCopy.innerHTML = TS_SVG_COPY;
-                        locCopy.title = 'Lagerort kopieren';
-                        locCopy.addEventListener('mouseenter', () => locCopy.style.opacity = '1');
-                        locCopy.addEventListener('mouseleave', () => locCopy.style.opacity = '.5');
-                        locCopy.onclick = () => { navigator.clipboard.writeText(`APN: ${r.part}\nBeschreibung: ${r.desc}\nMenge: ${r.bestand}\nLagerort: ${r.lagerort}`); tsToast('📋 Details kopiert'); };
-                        loc.appendChild(locSpan); loc.appendChild(locCopy);
-                    } else { loc.appendChild(locSpan); }
-
-                    // actions cell
-                    const act = tsCell('actions');
-                    const addBtn = tsActionBtn(TS_SVG_PLUS, 'Zu gespeicherten Teilen hinzufügen');
-                    const ckBtn  = tsActionBtn(TS_SVG_CHECK, 'Bereits gespeichert');
-                    const rmBtn  = tsActionBtn(TS_SVG_REMOVE, 'Entfernen');
-                    rmBtn.addEventListener('mouseenter', () => { rmBtn.style.color='var(--apm-danger,#ef4444)'; });
-                    rmBtn.addEventListener('mouseleave', () => { rmBtn.style.color='var(--apm-text-secondary,#94a3b8)'; rmBtn.style.background='transparent'; });
-
-                    if (isSaved) {
-                        act.appendChild(ckBtn); act.appendChild(rmBtn);
-                        rmBtn.onclick = () => {
-                            const cur = tsLoad(); const idx = cur.findIndex(e => e.part === r.part);
-                            if (idx >= 0) { cur.splice(idx, 1); tsSave(cur); }
-                            row.style.opacity = '1'; ckBtn.remove(); rmBtn.remove(); act.appendChild(addBtn);
-                            tsRebuildGrid(searchResults);
-                            tsToast(`🗑️ "${r.part}" entfernt`);
-                        };
-                    } else {
-                        act.appendChild(addBtn);
-                        addBtn.onclick = () => {
-                            const alias = (prompt(`Alias für "${r.part}":\n(leer = Partnummer als Key)`, r.part.toLowerCase()) ?? '').trim();
-                            const key = alias || r.part.toLowerCase();
-                            const cur = tsLoad();
-                            if (!cur.some(e => e.part === r.part)) { cur.push({key, part:r.part, desc:r.desc, uom:r.uom}); tsSave(cur); }
-                            row.style.opacity = '.55'; addBtn.remove(); act.appendChild(ckBtn); act.appendChild(rmBtn);
-                            rmBtn.onclick = () => {
-                                const cur2 = tsLoad(); const idx = cur2.findIndex(e => e.part === r.part);
-                                if (idx >= 0) { cur2.splice(idx, 1); tsSave(cur2); }
-                                row.style.opacity = '1'; ckBtn.remove(); rmBtn.remove(); act.appendChild(addBtn);
-                                tsRebuildGrid(searchResults);
-                                tsToast(`🗑️ "${r.part}" entfernt`);
-                            };
-                            tsRebuildGrid(searchResults);
-                            tsToast(`✅ "${r.part}" gespeichert als "${key}"`);
-                        };
-                    }
-
-                    [tsImgCell(r), tsPartCell(r.part, r.eamid), tsDescCell(r.part, r.desc), instock, stores, uom, loc, act].forEach(c => row.appendChild(c));
-                    grid.appendChild(row);
-                });
-            }
-        }
-
-        // ── Gespeicherte Teile ──
-        const saved = tsLoad();
-        const secSaved = tsEl('div', 'apm-pb-section-label');
-        secSaved.textContent = 'Gespeicherte Teile';
-        grid.appendChild(secSaved);
-
-        if (saved.length === 0) {
-            const empty = tsEl('div', 'apm-pb-empty');
-            empty.textContent = 'Keine gespeicherten Teile';
-            grid.appendChild(empty);
-        } else {
-            // Group by first letter of key
-            const groups = {};
-            saved.forEach(e => { const g = (e.key||e.part||'?')[0].toUpperCase(); (groups[g] = groups[g]||[]).push(e); });
-
-            Object.keys(groups).sort().forEach(gname => {
-                // Group header (grid-column: 1/-1)
-                const ghdr = tsEl('div', 'apm-pb-group-header');
-                const gleft = tsEl('span', 'apm-pb-group-left');
-                const gcaret = tsEl('span', 'apm-pb-group-caret'); gcaret.innerHTML = TS_SVG_CARET;
-                gleft.appendChild(gcaret);
-                const gcenter = tsEl('span', 'apm-pb-group-center');
-                const gname_el = tsEl('span', 'apm-pb-group-name'); gname_el.textContent = gname;
-                gcenter.appendChild(gname_el);
-                const gtools = tsEl('div', 'apm-pb-group-tools');
-                ghdr.appendChild(gleft); ghdr.appendChild(gcenter); ghdr.appendChild(gtools);
-
-                // Collapse toggle
-                let collapsed = false;
-                const rowEls = [];
-                ghdr.addEventListener('click', () => {
-                    collapsed = !collapsed;
-                    gcaret.style.transform = collapsed ? 'rotate(-90deg)' : '';
-                    rowEls.forEach(r => r.classList.toggle('is-hidden', collapsed));
-                });
-                grid.appendChild(ghdr);
-
-                // Rows
-                groups[gname].forEach(entry => {
-                    const row = tsEl('div', 'apm-pb-row');
-                    row.dataset.apn = entry.part; row.dataset.section = 'fav';
-                    row.addEventListener('mouseenter', () => row.classList.add('is-hovered'));
-                    row.addEventListener('mouseleave', () => row.classList.remove('is-hovered'));
-                    rowEls.push(row);
-
-                    // Empty image cell (saved parts usually have no live image)
-                    const imgC = tsCell('image');
-                    imgC.innerHTML = '<div class="apm-pb-img-placeholder" style="width:40px;height:40px;border-radius:var(--apm-radius-sm,4px);background:var(--apm-surface-sunken,#0f1621);display:flex;align-items:center;justify-content:center;color:var(--apm-text-disabled,#475569);font-size:11px;">—</div>';
-
-                    // Desc & location empty for saved (no live data)
-                    const instock = tsCell('instock'); instock.textContent = '—';
-                    const stores  = tsCell('stores');  stores.textContent  = '—';
-                    const uom     = tsCell('uom');     uom.textContent     = entry.uom || '—';
-                    const loc     = tsCell('location');
-                    const locSpan = tsEl('span', 'apm-ps-loc-text', 'color:var(--apm-text-disabled,#475569);font-style:italic;');
-                    locSpan.textContent = '—';
-                    loc.appendChild(locSpan);
-
-                    // Actions
-                    const act = tsCell('actions');
-                    const cpBtn = tsActionBtn(TS_SVG_COPY,   'Partnummer kopieren');
-                    const rmBtn = tsActionBtn(TS_SVG_REMOVE, 'Entfernen');
-                    rmBtn.addEventListener('mouseenter', () => rmBtn.style.color = 'var(--apm-danger,#ef4444)');
-                    rmBtn.addEventListener('mouseleave', () => { rmBtn.style.color = 'var(--apm-text-secondary,#94a3b8)'; rmBtn.style.background = 'transparent'; });
-                    cpBtn.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
-                    rmBtn.onclick = () => {
-                        const cur = tsLoad(); const idx = cur.findIndex(e => e.part === entry.part && e.key === entry.key);
-                        if (idx >= 0) { cur.splice(idx, 1); tsSave(cur); }
-                        row.classList.add('is-hidden');
-                        tsToast(`🗑️ "${entry.part}" entfernt`);
-                        tsRebuildGrid(searchResults);
-                    };
-                    act.appendChild(cpBtn); act.appendChild(rmBtn);
-
-                    [imgC, tsPartCell(entry.part, null), tsDescCell(entry.part, entry.desc||entry.key), instock, stores, uom, loc, act].forEach(c => row.appendChild(c));
-                    grid.appendChild(row);
-                });
-            });
-        }
-
-        body.appendChild(grid);
-    }
-
-    // Lazy stock enrichment — lädt Bestand+Lagerort nach Render
     async function tsEnrichStock(results, gridEl) {
         try {
-            const cat = (typeof unsafeWindow !== 'undefined' ? unsafeWindow : window)?.APMApi?.get?.('partsCatalog');
+            const cat = tsAPM();
             if (!cat?.fetchPartStock) return;
             for (const r of results) {
                 try {
-                    const s = await cat.fetchPartStock(r.part, {site: 'FRA7'});
-                    const row = gridEl?.querySelector('[data-part="' + r.part + '"]');
+                    const s = await cat.fetchPartStock(r.part, {site:'FRA7'});
+                    const row = gridEl?.querySelector(`[data-part="${r.part}"]`);
                     if (!row || !s) continue;
-                    const qty    = s?.summary?.totalQty;
-                    const bin    = s?.summary?.primaryBin || s?.bins?.[0]?.bin || '';
-                    const stores = s?.summary?.storeCount;
-                    const cell_b = row.querySelector('.apm-pb-cell-instock');
-                    const cell_s = row.querySelector('.apm-pb-cell-stores');
-                    const cell_l = row.querySelector('.apm-ps-loc-text');
-                    if (cell_b && qty != null) cell_b.textContent = qty === 0 ? '0' : String(qty);
-                    if (cell_s && stores != null) cell_s.textContent = String(stores);
-                    if (cell_l && bin) cell_l.textContent = bin;
-                } catch(_) {}
+                    const qty=s?.summary?.totalQty, bin=s?.summary?.primaryBin||s?.bins?.[0]?.bin||'', stores=s?.summary?.storeCount;
+                    const cb=row.querySelector('.ts-cell-bestand'), cs=row.querySelector('.ts-cell-lager'), cl=row.querySelector('.ts-cell-lagerort');
+                    if(cb&&qty!=null)cb.textContent=String(qty);
+                    if(cs&&stores!=null)cs.textContent=String(stores);
+                    if(cl&&bin)cl.textContent=bin;
+                } catch(_){}
             }
-        } catch(_) {}
+        } catch(_){}
+    }
+
+    function tsBuildGrid(results, saved) {
+        const wrap = tsEl('div', {flex:'1',overflowY:'auto',overflowX:'auto'});
+
+        if (results === null) {
+            // initial state — keine suche
+            const intro = tsEl('div', {padding:'32px 20px',color:C.muted,fontSize:'13px',textAlign:'center'});
+            intro.textContent = 'Teile-Nr. oder Beschreibung eingeben…';
+            wrap.appendChild(intro);
+        } else if (results.length === 0) {
+            const empty = tsEl('div', {padding:'32px 20px',color:C.muted,fontSize:'13px',textAlign:'center'});
+            empty.textContent = 'Keine Treffer';
+            wrap.appendChild(empty);
+        } else {
+            // Grid
+            const cols = '44px minmax(100px,0.8fr) minmax(200px,2fr) 60px 52px 52px minmax(80px,1fr) 80px';
+            const grid = tsEl('div', {display:'grid',gridTemplateColumns:cols,width:'100%',minWidth:'700px'});
+
+            // Header row
+            const hdr = tsEl('div', {display:'contents'});
+            for (const [lbl,cls] of [['Bild',''],['Teil',''],['Beschreibung',''],['Bestand','ts-cell-bestand'],['Lager',''],['UOM',''],['Lagerort',''],['','']] ) {
+                const th = tsEl('div', {padding:'6px 8px',fontSize:'11px',color:C.muted,borderBottom:`1px solid ${C.border}`,fontWeight:'600',letterSpacing:'.04em',textTransform:'uppercase',position:'sticky',top:'0',background:C.bg1,zIndex:'1'});
+                th.textContent = lbl;
+                grid.appendChild(th);
+            }
+
+            for (const r of results) {
+                const isSaved = saved.some(e => e.part === r.part);
+                const row = tsEl('div', {display:'contents'});
+                row.dataset = {};
+
+                const cells = [];
+                const mkCell = (cls='') => {
+                    const c = tsEl('div', {padding:'7px 8px',fontSize:'12px',color:C.text,borderBottom:`1px solid rgba(42,52,71,.6)`,display:'flex',alignItems:'center',background:isSaved?'rgba(59,130,246,.04)':'transparent'});
+                    if(cls) c.className = cls;
+                    cells.push(c);
+                    return c;
+                };
+
+                // Image
+                const imgC = mkCell();
+                if (r.pic) {
+                    const img = document.createElement('img');
+                    img.style.cssText = 'width:36px;height:36px;object-fit:contain;border-radius:4px;background:#0f1621;';
+                    img.onerror = () => { img.style.display='none'; };
+                    const s = tsGetSession();
+                    img.src = s ? `https://eu1.eam.hxgnsmartcloud.com/web/base/VIEWUDOC?documentcode=${encodeURIComponent(r.pic)}&keepcontenttype=true&eamid=${s.eamid}&tenant=AMAZONRMEEU_PRD` : '';
+                    imgC.appendChild(img);
+                }
+
+                // Part number
+                const partC = mkCell();
+                const link = document.createElement('a');
+                link.href = `https://eu1.eam.hxgnsmartcloud.com/web/base/logindisp?tenant=AMAZONRMEEU_PRD&SYSTEM_FUNCTION_NAME=SSPART&USER_FUNCTION_NAME=SSPART&DRILLBACK=YES&partcode=${encodeURIComponent(r.part)}`;
+                link.target = '_blank';
+                link.textContent = r.part;
+                link.style.cssText = `color:${C.accent};text-decoration:none;font-family:monospace;font-size:12px;font-weight:600;`;
+                link.addEventListener('mouseenter', ()=>link.style.textDecoration='underline');
+                link.addEventListener('mouseleave', ()=>link.style.textDecoration='none');
+                const cpPart = tsActionBtn(I_COPY, 'Kopieren');
+                cpPart.style.marginLeft = '4px';
+                cpPart.onclick = () => { navigator.clipboard.writeText(r.part); tsToast(`📋 ${r.part} kopiert`); };
+                partC.appendChild(link); partC.appendChild(cpPart);
+
+                // Desc
+                const descC = mkCell();
+                descC.textContent = r.desc;
+                descC.style.color = C.muted;
+
+                // Bestand / Lager / UOM / Lagerort
+                const bestandC = mkCell('ts-cell-bestand'); bestandC.textContent = r.bestand || '…';
+                bestandC.style.color = C.muted; bestandC.style.justifyContent = 'center';
+                const lagerC = mkCell('ts-cell-lager'); lagerC.textContent = r.lager || '…';
+                lagerC.style.color = C.muted; lagerC.style.justifyContent = 'center';
+                const uomC = mkCell(); uomC.textContent = r.uom || '—';
+                uomC.style.color = C.dim; uomC.style.justifyContent = 'center';
+                const lagerortC = mkCell('ts-cell-lagerort'); lagerortC.textContent = r.lagerort || '…';
+                lagerortC.style.color = C.muted;
+
+                // Actions
+                const actC = mkCell();
+                actC.style.gap = '2px';
+                const addBtn = tsActionBtn(I_PLUS, 'Speichern');
+                const ckBtn  = tsActionBtn(I_CHECK, 'Gespeichert');
+                ckBtn.style.color = C.green;
+                const rmBtn  = tsActionBtn(I_TRASH, 'Entfernen');
+                rmBtn.addEventListener('mouseenter', ()=>rmBtn.style.color=C.danger);
+                rmBtn.addEventListener('mouseleave', ()=>rmBtn.style.color=C.muted);
+
+                if (isSaved) {
+                    actC.appendChild(ckBtn);
+                    actC.appendChild(rmBtn);
+                    rmBtn.onclick = () => {
+                        const cur=tsLoad(), idx=cur.findIndex(e=>e.part===r.part);
+                        if(idx>=0){cur.splice(idx,1);tsSave(cur);}
+                        tsToast(`🗑️ "${r.part}" entfernt`);
+                        rebuildBody();
+                    };
+                } else {
+                    actC.appendChild(addBtn);
+                    addBtn.onclick = () => {
+                        const cur=tsLoad();
+                        if(!cur.find(e=>e.part===r.part)) { cur.push({part:r.part,desc:r.desc,uom:r.uom,key:r.desc}); tsSave(cur); }
+                        tsToast(`✅ "${r.part}" gespeichert`);
+                        addBtn.replaceWith(ckBtn);
+                    };
+                }
+
+                // Assemble row — set data-part on all cells
+                for (const c of cells) { c.dataset.part = r.part; }
+                // dummy container for data-part lookup
+                const rowWrap = tsEl('div', {display:'contents'});
+                rowWrap.dataset.part = r.part;
+                cells.forEach(c => grid.appendChild(c));
+            }
+            wrap.appendChild(grid);
+        }
+
+        // Gespeicherte Teile section
+        const savedList = tsLoad();
+        if (savedList.length > 0) {
+            const sep = tsEl('div', {margin:'0 12px',borderTop:`1px solid ${C.border}`,paddingTop:'10px',paddingBottom:'4px'});
+            const secLbl = tsEl('div', {padding:'4px 8px 8px',fontSize:'11px',color:C.muted,fontWeight:'600',letterSpacing:'.05em',textTransform:'uppercase'});
+            secLbl.textContent = `Gespeicherte Teile (${savedList.length})`;
+            sep.appendChild(secLbl);
+            for (const entry of savedList) {
+                const row = tsEl('div', {display:'flex',alignItems:'center',gap:'8px',padding:'5px 8px',borderRadius:'4px',cursor:'default'});
+                row.addEventListener('mouseenter', ()=>row.style.background=C.bg2);
+                row.addEventListener('mouseleave', ()=>row.style.background='transparent');
+                const num = tsEl('span', {fontFamily:'monospace',fontSize:'12px',color:C.accent,fontWeight:'600',flexShrink:'0'});
+                num.textContent = entry.part;
+                const dsc = tsEl('span', {fontSize:'12px',color:C.muted,flex:'1',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'});
+                dsc.textContent = entry.desc || entry.key || '';
+                const cp = tsActionBtn(I_COPY, 'Kopieren');
+                cp.onclick = () => { navigator.clipboard.writeText(entry.part); tsToast(`📋 ${entry.part} kopiert`); };
+                const rm = tsActionBtn(I_TRASH, 'Entfernen');
+                rm.addEventListener('mouseenter', ()=>rm.style.color=C.danger);
+                rm.addEventListener('mouseleave', ()=>rm.style.color=C.muted);
+                rm.onclick = () => {
+                    const cur=tsLoad(), idx=cur.findIndex(e=>e.part===entry.part);
+                    if(idx>=0){cur.splice(idx,1);tsSave(cur);}
+                    row.remove();
+                    tsToast(`🗑️ "${entry.part}" entfernt`);
+                };
+                row.appendChild(num); row.appendChild(dsc); row.appendChild(cp); row.appendChild(rm);
+                sep.appendChild(row);
+            }
+            wrap.appendChild(sep);
+        }
+
+        return wrap;
+    }
+
+    let _currentResults = null;
+    let _currentBody = null;
+
+    function rebuildBody() {
+        if (!_currentBody) return;
+        _currentBody.innerHTML = '';
+        const saved = tsLoad();
+        _currentBody.appendChild(tsBuildGrid(_currentResults, saved));
     }
 
     function showTeilesuche() {
-        if (document.getElementById('apmgod-teile-panel')) return;
-        tsInjectFallbackCSS();
+        const existing = document.getElementById('apmgod-ts');
+        if (existing) { existing.remove(); return; }
 
-        const popup = document.createElement('div');
-        popup.id = 'apmgod-teile-panel';
-        // Reuse APM Master's CSS classes exactly
-        popup.className = 'apm-pb-popup apm-ps-popup apm-ui-panel';
-        popup.setAttribute('role', 'dialog');
-        popup.setAttribute('aria-label', 'Teilesuche');
-        popup.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);display:flex;visibility:visible;z-index:10001;';
-
-        popup.innerHTML = `
-            <div class="apm-pb-header">
-                <span class="apm-pb-title">Teilesuche</span>
-                <div class="apm-pb-header-actions">
-                    <select class="apm-pb-dataspy-select apm-pb-site-select" id="apmgod-ts-site" title="Standort">
-                        <option value="">Alle Standorte</option>
-                        <option value="FRA7" selected>FRA7</option>
-                    </select>
-                    <label class="apm-pb-dataspy-label" style="font-size:var(--apm-text-sm,12px);color:var(--apm-text-muted,#64748b);white-space:nowrap;">Bereich:</label>
-                    <select id="apmgod-ts-dataspy" class="apm-pb-dataspy-select" title="Katalogbereich">
-                        <option value="82">All Parts</option>
-                        <option value="100455">Parts in Service</option>
-                        <option value="82" selected>All Parts</option>
-                    </select>
-                    <button type="button" class="apm-pb-close" id="apmgod-ts-pin" title="Panel andocken (Floating / Oben / Unten)" style="margin-right:2px;font-size:14px;">📌</button>
-                    <button type="button" class="apm-pb-close" id="apmgod-ts-close" title="Schließen">×</button>
-                </div>
-            </div>
-            <div class="apm-pb-header-search">
-                <div class="apm-pb-header-search-label">Filialkatalog durchsuchen:</div>
-                <div class="apm-pb-search-group" style="display:flex;gap:6px;">
-                    <input id="apmgod-ts-part" type="search" placeholder="Teile-Nr." class="apm-pb-search apm-pb-search-multi">
-                    <input id="apmgod-ts-desc" type="search" placeholder="Beschreibung" class="apm-pb-search apm-pb-search-multi">
-                    <input id="apmgod-ts-mfr"  type="search" placeholder="Hersteller-Teile-Nr." class="apm-pb-search apm-pb-search-multi">
-                    <button id="apmgod-ts-clear" type="button" class="apm-pb-search-clear is-hidden">✕ Löschen</button>
-                </div>
-            </div>
-            <div class="apm-pb-body" id="apmgod-ts-body"></div>
-        `;
-        document.body.appendChild(popup);
+        // Outer popup
+        const popup = tsEl('div', {
+            position:'fixed', top:'52px', left:'50%', transform:'translateX(-50%)',
+            width:'860px', maxWidth:'calc(100vw - 40px)',
+            background:C.bg0, border:`1px solid ${C.border}`,
+            borderRadius:'8px', boxShadow:C.shadow,
+            zIndex:'100001', display:'flex', flexDirection:'column',
+            maxHeight:'calc(100vh - 80px)', fontFamily:'Arial,sans-serif',
+            overflow:'hidden',
+        });
+        popup.id = 'apmgod-ts';
 
         // Restore position
         try {
-            const pos = JSON.parse(localStorage.getItem('apmgod-teile-pos') || 'null');
-            if (pos) { popup.style.left = pos.left; popup.style.top = pos.top; popup.style.transform = 'none'; }
-        } catch(e) {}
+            const pos = JSON.parse(localStorage.getItem('apmgod-ts-pos')||'null');
+            if (pos) { popup.style.left=pos.left; popup.style.top=pos.top; popup.style.transform='none'; }
+        } catch(_) {}
 
-        // Draggable on header
-        const hdr = popup.querySelector('.apm-pb-header');
-        let drag = false, ox = 0, oy = 0;
-        hdr.addEventListener('mousedown', e => {
-            if (e.target.closest('.apm-pb-close, select, button')) return;
-            drag = true; const r = popup.getBoundingClientRect();
-            ox = e.clientX - r.left; oy = e.clientY - r.top;
-            popup.style.transform = 'none';
+        // ── Header ──
+        const hdr = tsEl('div', {
+            display:'flex', alignItems:'center', gap:'8px', padding:'10px 14px',
+            borderBottom:`1px solid ${C.border}`, flexShrink:'0',
+            background:C.bg1, cursor:'grab', userSelect:'none',
+            borderRadius:'8px 8px 0 0',
         });
-        document.addEventListener('mousemove', e => { if (!drag) return; popup.style.left = (e.clientX-ox)+'px'; popup.style.top = (e.clientY-oy)+'px'; });
+        const title = tsEl('span', {fontSize:'13px',fontWeight:'700',color:C.text,flexShrink:'0'});
+        title.textContent = 'Teilesuche';
+
+        // site selector
+        const site = document.createElement('select');
+        tsStyle(site, {background:C.bg2,border:`1px solid ${C.border}`,color:C.text,borderRadius:'4px',padding:'3px 6px',fontSize:'12px',cursor:'pointer'});
+        site.innerHTML = '<option value="FRA7" selected>FRA7</option>';
+
+        // dataspy selector
+        const dsSel = document.createElement('select');
+        tsStyle(dsSel, {background:C.bg2,border:`1px solid ${C.border}`,color:C.text,borderRadius:'4px',padding:'3px 6px',fontSize:'12px',cursor:'pointer'});
+        dsSel.innerHTML = '<option value="82" selected>All Parts</option><option value="100455">Parts in Service</option><option value="101496">Parts in my Stores</option>';
+
+        // search inputs
+        function mkInput(ph) {
+            const inp = document.createElement('input');
+            inp.type = 'search'; inp.placeholder = ph;
+            tsStyle(inp, {flex:'1',minWidth:'80px',background:C.bg2,border:`1px solid ${C.border}`,color:C.text,
+                borderRadius:'4px',padding:'4px 8px',fontSize:'12px',outline:'none'});
+            inp.addEventListener('focus', ()=>inp.style.borderColor=C.accent);
+            inp.addEventListener('blur',  ()=>inp.style.borderColor=C.border);
+            return inp;
+        }
+        const inpPart = mkInput('Teile-Nr.');
+        const inpDesc = mkInput('Beschreibung');
+        const inpMfr  = mkInput('Hersteller-Nr.');
+
+        // close button
+        const closeBtn = tsEl('button', {background:'transparent',border:'none',cursor:'pointer',
+            color:C.muted,fontSize:'18px',lineHeight:'1',padding:'0 2px',flexShrink:'0'});
+        closeBtn.type = 'button'; closeBtn.title = 'Schließen'; closeBtn.textContent = '×';
+        closeBtn.addEventListener('mouseenter', ()=>closeBtn.style.color=C.text);
+        closeBtn.addEventListener('mouseleave', ()=>closeBtn.style.color=C.muted);
+        closeBtn.onclick = () => popup.remove();
+
+        hdr.appendChild(title);
+        hdr.appendChild(tsEl('span', {flex:'1'}));
+        hdr.appendChild(site);
+        hdr.appendChild(dsSel);
+        hdr.appendChild(inpPart);
+        hdr.appendChild(inpDesc);
+        hdr.appendChild(inpMfr);
+        hdr.appendChild(closeBtn);
+
+        // ── Body ──
+        const body = tsEl('div', {flex:'1',overflowY:'auto',minHeight:'120px'});
+        _currentBody = body;
+        _currentResults = null;
+        body.appendChild(tsBuildGrid(null, tsLoad()));
+
+        popup.appendChild(hdr);
+        popup.appendChild(body);
+        document.body.appendChild(popup);
+
+        // Draggable
+        let drag=false, ox=0, oy=0;
+        hdr.addEventListener('mousedown', e => {
+            if (e.target.closest('select,input,button')) return;
+            drag=true; hdr.style.cursor='grabbing';
+            const r=popup.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top;
+            popup.style.transform='none';
+        });
+        document.addEventListener('mousemove', e => {
+            if (!drag) return;
+            popup.style.left=(e.clientX-ox)+'px'; popup.style.top=(e.clientY-oy)+'px';
+        });
         document.addEventListener('mouseup', () => {
-            if (drag) { const r = popup.getBoundingClientRect(); localStorage.setItem('apmgod-teile-pos', JSON.stringify({left:r.left+'px',top:r.top+'px'})); }
-            drag = false;
-        });
-
-        // Close
-        popup.querySelector('#apmgod-ts-close').onclick = () => popup.remove();
-
-        // Anchor cycling: floating → top → bottom
-        const TS_ANCHOR_KEY = 'apmgod-teile-anchor';
-        const pinBtn = popup.querySelector('#apmgod-ts-pin');
-        const anchors = ['floating','top','bottom'];
-        const pinIcons = {'floating':'📌','top':'⬆️','bottom':'⬇️'};
-        const pinTitles = {'floating':'Floating (ziehbar)','top':'Oben angedockt','bottom':'Unten angedockt'};
-
-        function applyAnchor(mode) {
-            localStorage.setItem(TS_ANCHOR_KEY, mode);
-            pinBtn.textContent = pinIcons[mode];
-            pinBtn.title = pinTitles[mode];
-            popup.style.transition = 'top .2s, bottom .2s';
-            if (mode === 'top') {
-                popup.style.position = 'fixed';
-                popup.style.top = '0px';
-                popup.style.bottom = '';
-                popup.style.left = '0px';
-                popup.style.right = '0px';
-                popup.style.transform = 'none';
-                popup.style.width = '100%';
-                popup.style.maxWidth = '100%';
-                popup.style.borderRadius = '0 0 6px 6px';
-            } else if (mode === 'bottom') {
-                popup.style.position = 'fixed';
-                popup.style.bottom = '0px';
-                popup.style.top = '';
-                popup.style.left = '0px';
-                popup.style.right = '0px';
-                popup.style.transform = 'none';
-                popup.style.width = '100%';
-                popup.style.maxWidth = '100%';
-                popup.style.borderRadius = '6px 6px 0 0';
-            } else {
-                // restore floating
-                popup.style.width = '';
-                popup.style.maxWidth = '';
-                popup.style.borderRadius = '';
-                popup.style.bottom = '';
-                popup.style.right = '';
-                try {
-                    const pos = JSON.parse(localStorage.getItem('apmgod-teile-pos') || 'null');
-                    if (pos) { popup.style.left = pos.left; popup.style.top = pos.top; popup.style.transform = 'none'; }
-                    else { popup.style.left = '50%'; popup.style.top = '60px'; popup.style.transform = 'translateX(-50%)'; }
-                } catch(_) { popup.style.left = '50%'; popup.style.top = '60px'; popup.style.transform = 'translateX(-50%)'; }
+            if (drag) {
+                hdr.style.cursor='grab';
+                const r=popup.getBoundingClientRect();
+                localStorage.setItem('apmgod-ts-pos', JSON.stringify({left:r.left+'px',top:r.top+'px'}));
             }
-        }
-
-        // Restore saved anchor
-        const savedAnchor = localStorage.getItem(TS_ANCHOR_KEY) || 'floating';
-        applyAnchor(savedAnchor);
-
-        pinBtn.onclick = () => {
-            const cur = localStorage.getItem(TS_ANCHOR_KEY) || 'floating';
-            const next = anchors[(anchors.indexOf(cur) + 1) % anchors.length];
-            applyAnchor(next);
-        };
-
-        // Disable drag when anchored
-        hdr.addEventListener('mousedown', e => {
-            if (e.target.closest('.apm-pb-close, select, button')) return;
-            if ((localStorage.getItem(TS_ANCHOR_KEY) || 'floating') !== 'floating') return;
-        }, true);
-
-        // Search inputs
-        const pInp = popup.querySelector('#apmgod-ts-part');
-        const dInp = popup.querySelector('#apmgod-ts-desc');
-        const mInp = popup.querySelector('#apmgod-ts-mfr');
-        const clrBtn = popup.querySelector('#apmgod-ts-clear');
-        let searchTimer;
-
-        const updateClear = () => {
-            const hasVal = pInp.value || dInp.value || mInp.value;
-            clrBtn.classList.toggle('is-hidden', !hasVal);
-        };
-        clrBtn.onclick = () => { pInp.value = ''; dInp.value = ''; mInp.value = ''; updateClear(); tsRebuildGrid(); };
-
-        [pInp, dInp, mInp].forEach(inp => {
-            inp.addEventListener('input', () => {
-                updateClear();
-                clearTimeout(searchTimer);
-                if (pInp.value.trim() || dInp.value.trim()) searchTimer = setTimeout(doSearch, 350);
-            });
-            inp.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(searchTimer); doSearch(); } });
+            drag=false;
         });
 
-        async function doSearch() {
-            const pq = pInp.value.trim(), dq = dInp.value.trim();
-            if (!pq && !dq) return;
-            const body = document.getElementById('apmgod-ts-body');
-            if (body) body.innerHTML = '<div style="padding:16px 14px;color:var(--apm-text-muted,#64748b);font-size:var(--apm-text-sm,12px);font-style:italic;">⏳ Suche läuft…</div>';
-            const dataspyId = popup.querySelector('#apmgod-ts-dataspy')?.value || '101496';
-            const mq = mInp.value.trim();
-            const results = await tsSearch(pq, dq, mq, dataspyId);
-            tsRebuildGrid(results);
-            // lazy stock enrichment nach dem render
-            const grid = document.getElementById('apmgod-ts-grid');
-            if (grid && results.length) tsEnrichStock(results, grid);
+        // Search logic
+        let timer;
+        function doSearch() {
+            const pq=inpPart.value.trim(), dq=inpDesc.value.trim(), mq=inpMfr.value.trim();
+            if (!pq&&!dq&&!mq) return;
+            body.innerHTML = '';
+            const loading = tsEl('div', {padding:'32px',color:C.muted,fontSize:'13px',textAlign:'center'});
+            loading.textContent = 'Suche läuft…';
+            body.appendChild(loading);
+            tsSearch(pq, dq, mq, dsSel.value).then(results => {
+                _currentResults = results;
+                body.innerHTML = '';
+                body.appendChild(tsBuildGrid(results, tsLoad()));
+                // lazy stock enrichment
+                const grid = body.querySelector('[data-part]')?.parentElement;
+                if (results.length) tsEnrichStock(results, body);
+            });
         }
 
-        // Initial render (saved parts only)
-        tsRebuildGrid();
-        setTimeout(() => pInp.focus(), 80);
+        [inpPart, inpDesc, inpMfr].forEach(inp => {
+            inp.addEventListener('input', () => { clearTimeout(timer); if(inp.value.trim()) timer=setTimeout(doSearch,350); });
+            inp.addEventListener('keydown', e => { if(e.key==='Enter'){clearTimeout(timer);doSearch();} });
+        });
+
+        setTimeout(() => inpDesc.focus(), 50);
     }
 
     // ALT+5 toggle
-    document.addEventListener('keydown', function(e) {
-        if (e.altKey && e.key === '5') {
-            e.preventDefault();
-            const ex = document.getElementById('apmgod-teile-panel');
-            if (ex) ex.remove(); else showTeilesuche();
-        }
+    document.addEventListener('keydown', e => {
+        if (e.altKey && e.key==='5') { e.preventDefault(); showTeilesuche(); }
     });
 
-    // Inject trigger button (fixed, top-right area)
+    // Trigger button (fixed, oben rechts)
     (function() {
-        if (document.getElementById('apmgod-teile-trigger')) return;
-        const btn = document.createElement('button');
-        btn.id = 'apmgod-teile-trigger';
-        btn.className = 'apm-btn apm-btn--neutral';
-        btn.style.cssText = 'position:fixed;top:8px;right:160px;z-index:9997;height:28px;padding:0 12px;font-size:var(--apm-text-sm,12px);font-weight:600;cursor:pointer;border-radius:var(--apm-radius-sm,4px);border:1px solid var(--apm-border,#2a3447);background:var(--apm-surface-inset,#151b27);color:var(--apm-text-primary,#c8d4e8);display:flex;align-items:center;gap:6px;transition:all .15s;';
-        btn.innerHTML = `${TS_SVG_COPY} Teilesuche`;
-        btn.title = 'Teilesuche öffnen (ALT+5)';
-        btn.onmouseover = () => { btn.style.borderColor='var(--apm-accent,#3b82f6)'; btn.style.color='var(--apm-accent,#3b82f6)'; };
-        btn.onmouseout  = () => { btn.style.borderColor='var(--apm-border,#2a3447)'; btn.style.color='var(--apm-text-primary,#c8d4e8)'; };
-        btn.onclick = () => { const ex = document.getElementById('apmgod-teile-panel'); if (ex) ex.remove(); else showTeilesuche(); };
+        if (document.getElementById('apmgod-ts-btn')) return;
+        const btn = tsEl('button', {
+            position:'fixed', top:'6px', right:'155px', zIndex:'99999',
+            height:'28px', padding:'0 12px', fontSize:'12px', fontWeight:'600',
+            cursor:'pointer', borderRadius:'4px', fontFamily:'Arial,sans-serif',
+            border:`1px solid ${C.border}`, background:C.bg1, color:C.text,
+            display:'flex', alignItems:'center', gap:'6px', transition:'all .15s',
+        });
+        btn.id = 'apmgod-ts-btn';
+        btn.type = 'button';
+        btn.title = 'Teilesuche (ALT+5)';
+        btn.innerHTML = I_COPY + ' Teilesuche';
+        btn.addEventListener('mouseenter', ()=>{btn.style.borderColor=C.accent;btn.style.color=C.accent;});
+        btn.addEventListener('mouseleave', ()=>{btn.style.borderColor=C.border;btn.style.color=C.text;});
+        btn.onclick = showTeilesuche;
         document.body.appendChild(btn);
     })();
-
 
 })();
