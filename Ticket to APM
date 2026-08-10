@@ -609,23 +609,33 @@
 
     function loadAllWOs(docs) {
         if (!docs || !docs.length) return;
+        // Statt seriell (1 Request -> 120ms warten -> naechster) laufen jetzt
+        // WO_CONCURRENCY Requests gleichzeitig. Vermeidet lange setTimeout-Ketten,
+        // die im Hintergrund-Tab vom Browser gedrosselt werden, und ist strukturell
+        // schneller (Gesamtzeit ~ N/Concurrency statt N*(RTT+120ms)).
+        const WO_CONCURRENCY = 6;
         let idx = 0;
-        function next() {
+
+        function renderOrCache(doc, wo) {
+            const c = document.getElementById('wo-' + doc.shortId);
+            if (c) renderWOCell(c, wo);
+        }
+
+        function worker() {
             if (idx >= docs.length) return;
             const doc = docs[idx++];
             if (_woCache[doc.shortId] !== undefined) {
-                const c = document.getElementById('wo-' + doc.shortId);
-                if (c) renderWOCell(c, _woCache[doc.shortId]);
-                next();
+                renderOrCache(doc, _woCache[doc.shortId]);
+                worker();
                 return;
             }
             fetchWOForDoc(doc, (wo) => {
-                const c = document.getElementById('wo-' + doc.shortId);
-                if (c) renderWOCell(c, wo);
-                setTimeout(next, 120);
+                renderOrCache(doc, wo);
+                worker();
             });
         }
-        next();
+
+        for (let i = 0; i < Math.min(WO_CONCURRENCY, docs.length); i++) worker();
     }
 
     function renderWOCell(cell, wo) {
