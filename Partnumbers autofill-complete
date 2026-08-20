@@ -163,6 +163,29 @@
         const e=document.querySelector(`input[name="${name}"]`);if(e){e.value=val;e.dispatchEvent(new Event('change',{bubbles:true}));}
     }
 
+    // FENSTER ZIEHEN — ein globaler Drag-State reicht, Editor kann nur einmal offen sein
+    let _dragCtx=null;
+    document.addEventListener('mousemove',e=>{
+        if(!_dragCtx)return;
+        const dx=e.clientX-_dragCtx.x0,dy=e.clientY-_dragCtx.y0;
+        const p=_dragCtx.panel;
+        const w=p.offsetWidth,h=p.offsetHeight;
+        let nl=Math.max(4,Math.min(window.innerWidth-w-4,_dragCtx.left+dx));
+        let nt=Math.max(4,Math.min(window.innerHeight-h-4,_dragCtx.top+dy));
+        p.style.left=nl+'px';p.style.top=nt+'px';
+    });
+    document.addEventListener('mouseup',()=>{_dragCtx=null;});
+    function makeDraggable(handle,panel,skipEl){
+        handle.style.cursor='move';handle.style.userSelect='none';
+        handle.addEventListener('mousedown',e=>{
+            if(skipEl&&(e.target===skipEl||skipEl.contains(e.target)))return; // Schließen-Button ausnehmen
+            const r=panel.getBoundingClientRect();
+            panel.style.transform='none';panel.style.left=r.left+'px';panel.style.top=r.top+'px';
+            _dragCtx={panel,x0:e.clientX,y0:e.clientY,left:r.left,top:r.top};
+            e.preventDefault();
+        });
+    }
+
     // EDITOR
     function injectBtn(){
         const TITLES=['Part Details & Planning','Teiledetails und Planung'];
@@ -187,8 +210,8 @@
     function openEditor(startTab='db'){
         if(editorOpen)return;editorOpen=true;
         document.getElementById('pc-overlay')?.remove();
-        const overlay=mk('div','pc-overlay',`position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000000;display:flex;justify-content:center;align-items:center;font-family:Arial,sans-serif;`);
-        const panel=mk('div','',`background:#151b27;border:1px solid #2a3447;border-radius:8px;width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.7);`);
+        const overlay=mk('div','pc-overlay',`position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000000;font-family:Arial,sans-serif;`);
+        const panel=mk('div','',`position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#151b27;border:1px solid #2a3447;border-radius:8px;width:760px;height:620px;min-width:480px;min-height:340px;max-width:96vw;max-height:96vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,.7);resize:both;overflow:hidden;`);
 
         // Header
         const hdr=mk('div','',`padding:12px 18px;border-bottom:1px solid #2a3447;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;`);
@@ -197,6 +220,7 @@
         cx.addEventListener('mouseenter',()=>cx.style.color='#e05555');cx.addEventListener('mouseleave',()=>cx.style.color='#556');
         cx.onclick=()=>{editorOpen=false;overlay.remove();};
         hdr.appendChild(tit);hdr.appendChild(cx);
+        makeDraggable(hdr,panel,cx);
 
         // Tabs
         const tabBar=mk('div','',`display:flex;background:#0f1520;border-bottom:1px solid #2a3447;flex-shrink:0;`);
@@ -350,6 +374,8 @@
                     img.onerror=()=>{imgCell.textContent='—';imgCell.style.cssText+='color:#334;font-size:12px;text-align:center;';};
                     img.addEventListener('mouseenter',()=>img.style.transform='scale(3) translateX(-8px)');
                     img.addEventListener('mouseleave',()=>img.style.transform='');
+                    img.addEventListener('mousedown',ev=>ev.stopPropagation(),true);
+                    img.addEventListener('click',ev=>{ev.stopPropagation();openLightbox(img.src,`${r.part} — ${r.desc}`);});
                     imgCell.appendChild(img);
                 } else {
                     imgCell.textContent='—';imgCell.style.cssText+='color:#334;font-size:12px;text-align:center;';
@@ -424,6 +450,19 @@
     function doExport(){const b=new Blob([JSON.stringify(partcodeMap,null,2)],{type:'application/json'});const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:'partcodes_export.json'});a.click();URL.revokeObjectURL(a.href);toast('📤 Exportiert!');}
     function doImport(){const i=Object.assign(document.createElement('input'),{type:'file',accept:'.json'});i.onchange=e=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{let imp=JSON.parse(ev.target.result);if(!Array.isArray(imp))imp=Object.entries(imp).map(([k,v])=>({key:k,part:v.part,desc:v.desc||''}));if(confirm(`${imp.length} Einträge importieren?`)){partcodeMap.push(...imp);saveMap(partcodeMap);toast('📥 Import ok!');}}catch(err){alert('Fehler: '+err.message);}};r.readAsText(file);};i.click();}
     function toast(msg){const t=mk('div','',`position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#1a2a3a;border:1px solid #2a4060;color:#c0d8f8;padding:10px 22px;border-radius:6px;font-size:14px;z-index:2000000;box-shadow:0 4px 12px rgba(0,0,0,.5);white-space:nowrap;`);t.textContent=msg;document.body.appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},2200);}
+    function openLightbox(src,caption){
+        document.getElementById('pc-lightbox')?.remove();
+        const ov=mk('div','pc-lightbox',`position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:2100000;display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:zoom-out;`);
+        const img=mk('img','',`max-width:92vw;max-height:86vh;object-fit:contain;border-radius:6px;box-shadow:0 12px 48px rgba(0,0,0,.7);`);
+        img.src=src;
+        const close=()=>{ov.remove();document.removeEventListener('keydown',escH,true);};
+        const escH=e=>{if(e.key==='Escape')close();};
+        document.addEventListener('keydown',escH,true);
+        ov.addEventListener('click',close);
+        ov.appendChild(img);
+        if(caption){const cap=mk('div','',`margin-top:14px;color:#c8d4e8;font-size:14px;font-family:Arial,sans-serif;max-width:80vw;text-align:center;`);cap.textContent=caption;ov.appendChild(cap);}
+        document.body.appendChild(ov);
+    }
 
     // EVENTS & INIT
     const sty=document.createElement('style');
@@ -435,5 +474,5 @@
     function init(){injectBtn();setTimeout(injectBtn,1000);setTimeout(injectBtn,3000);}
     document.readyState==='loading'?document.addEventListener('DOMContentLoaded',init):init();
     new MutationObserver(()=>injectBtn()).observe(document.body,{childList:true,subtree:true});
-    console.log('[Partcode v5.9] Ready. Session:',getSession()?.eamid?.slice(0,8)||'NOT FOUND');
+    console.log('[Partcode v5.9 + Lightbox + Drag] Ready. Session:',getSession()?.eamid?.slice(0,8)||'NOT FOUND');
 })();
