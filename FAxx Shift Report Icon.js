@@ -28,7 +28,6 @@
         { login: 'klikevi',  role: 'TECH',  star: false },
         { login: 'lugejaso', role: 'TECH',  star: false },
         { login: 'rmalogor', role: 'TECH',  star: true  },
-        { login: 'schmidqd', role: 'TECH',  star: false },
         { login: 'schudack', role: 'TECH',  star: false },
         { login: 'shalsami', role: 'TECH',  star: false },
         { login: 'sprinoli', role: 'TECH',  star: false },
@@ -39,7 +38,7 @@
     const EAM_ORDER = [
         'hsshimen', 'ionelvic', 'ivelik',
         'daldalci', 'halkenhc', 'jsonsta', 'kanataza', 'kedama', 'klikevi',
-        'lugejaso', 'rmalogor', 'schmidqd', 'schudack', 'shalsami', 'sprinoli', 'ussaxel',
+        'lugejaso', 'rmalogor', 'schudack', 'shalsami', 'sprinoli', 'ussaxel',
     ];
 
     const SG3_MAP = Object.fromEntries(SG3.map(e => [e.login, e]));
