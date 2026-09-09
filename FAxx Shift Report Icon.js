@@ -118,12 +118,31 @@
                 }, 500);
             }, 500);
 
+            // Sucht das Case-Liste-Grid und gibt es nur zurueck, wenn es fertig gerendert ist.
+            function findCaseGrid(iExt) {
+                try {
+                    for (const g of iExt.ComponentQuery.query('gridpanel')) {
+                        let gs;
+                        try { gs = g.getStore?.(); } catch(e) { continue; }
+                        if (!gs || !(gs.storeId || gs.id || '').includes('cscase_lst')) continue;
+                        if (!g.rendered) return null;
+                        const view = g.getView?.();
+                        if (!view || !view.rendered) return null;
+                        return g;
+                    }
+                } catch(e) {}
+                return null;
+            }
+
             function waitForList(iExt) {
                 let tries = 0;
                 const poll = setInterval(() => {
                     if (++tries > 80) { clearInterval(poll); finish(new Error('Liste timeout')); return; }
                     const ls = iExt.StoreManager.lookup(STORE_LIST);
                     if (!ls || ls.getCount() === 0) return;
+                    // Auf das gerenderte Grid warten, sonst kracht die Selektion in app.js.
+                    // Nach 10s trotzdem weitermachen, damit kein Timeout entsteht.
+                    if (!findCaseGrid(iExt) && tries < 20) return;
                     clearInterval(poll);
                     selectAndLoad(iExt, ls);
                 }, 500);
@@ -142,13 +161,17 @@
                 }
                 const idx = bestIdx !== -1 ? bestIdx : 0;
 
-                for (const g of iExt.ComponentQuery.query('gridpanel')) {
+                const caseGrid = findCaseGrid(iExt);
+                if (caseGrid) {
                     try {
-                        const gs = g.getStore?.();
-                        if (gs && (gs.storeId || gs.id || '').includes('cscase_lst')) {
-                            g.getSelectionModel().select(idx, false, false); break;
+                        const gs = caseGrid.getStore();
+                        const count = typeof gs.getCount === 'function' ? gs.getCount() : 0;
+                        const sm = caseGrid.getSelectionModel?.();
+                        if (sm && typeof sm.select === 'function' && idx < count) {
+                            const rec = typeof gs.getAt === 'function' ? gs.getAt(idx) : null;
+                            sm.select(rec || idx, false, false);
                         }
-                    } catch(e) {}
+                    } catch(e) { console.warn('[FA73v2] Case-Selektion uebersprungen:', e); }
                 }
 
                 const oldLs = iExt.StoreManager.lookup(STORE_LABOR);
