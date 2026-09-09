@@ -404,22 +404,39 @@
         DSclass.prototype.kanatazaOrigInitComponent = DSclass.prototype.initComponent;
         DSclass.prototype.initComponent = function() {
             this.kanatazaOrigInitComponent.apply(this, arguments);
-            let editItemIndex = -1;
-            this.items.each(function(item, index) {
-                if (item.text === "Edit" || item.text === "Bearbeiten" || (item.actionName && item.actionName.includes('EDIT'))) {
-                    editItemIndex = index;
-                    return false;
+            const self = this;
+            function addZeitenButton() {
+                if (self.kanatazaZeitenBtnAdded) return true;
+                const items = self.items;
+                if (!items || typeof items.each !== 'function') return false;
+                let editItemIndex = -1;
+                items.each(function(item, index) {
+                    if (item.text === "Edit" || item.text === "Bearbeiten" || (item.actionName && item.actionName.includes('EDIT'))) {
+                        editItemIndex = index;
+                        return false;
+                    }
+                });
+                let targetIndex = (editItemIndex !== -1) ? (editItemIndex + 1) : 3;
+                self.insert(targetIndex, {
+                    xtype: 'button',
+                    text: "⏱️ Zeiten",
+                    tooltip: "Stunden Planer öffnen",
+                    cls: 'apmod-zeiten-btn',
+                    handler: togglePanel
+                });
+                self.kanatazaZeitenBtnAdded = true;
+                console.log("[Kanataza Zeiten] Button an Position " + targetIndex + " eingefügt.");
+                return true;
+            }
+            try {
+                if (!addZeitenButton() && typeof this.on === 'function') {
+                    this.on('afterrender', function() {
+                        try { addZeitenButton(); } catch (e) { console.warn("[Kanataza Zeiten] Button-Einbau uebersprungen:", e); }
+                    }, this, { single: true });
                 }
-            });
-            let targetIndex = (editItemIndex !== -1) ? (editItemIndex + 1) : 3;
-            this.insert(targetIndex, {
-                xtype: 'button',
-                text: "⏱️ Zeiten",
-                tooltip: "Stunden Planer öffnen",
-                cls: 'apmod-zeiten-btn',
-                handler: togglePanel
-            });
-            console.log("[Kanataza Zeiten] Button an Position " + targetIndex + " eingefügt.");
+            } catch (e) {
+                console.warn("[Kanataza Zeiten] Button-Einbau uebersprungen:", e);
+            }
         };
     }
     function init() {
